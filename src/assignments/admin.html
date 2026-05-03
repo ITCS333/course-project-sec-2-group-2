@@ -1,64 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Character encoding -->
     <meta charset="UTF-8">
-
-    <!-- Responsive viewport -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Page title -->
     <title>Manage Assignments</title>
-
-    <!-- Stylesheet -->
+    <!-- Add your CSS stylesheet here -->
     <link rel="stylesheet" href="style.css">
-
-    <!-- Required: link admin.js with defer. -->
+    <!-- Required: link admin.js with defer -->
     <script src="admin.js" defer></script>
 </head>
 <body>
-
-    <!-- Header containing h1 -->
     <header>
         <h1>Manage Assignments</h1>
     </header>
 
-    <!-- Main content area -->
     <main>
         <!-- ============================================================
               Add / Edit Assignment Form
              ============================================================ -->
         <section>
             <h2>Add a New Assignment</h2>
-            <!-- form id="assignment-form" required by admin.js -->
             <form id="assignment-form" action="#">
                 <fieldset>
                     <legend>Assignment Details</legend>
                     
-                    <!-- Title Input -->
                     <label for="assignment-title">Title:</label>
                     <input type="text" id="assignment-title" name="assignment-title" required>
 
-                    <!-- Due Date Input -->
-                    <label for="assignment-date">Due Date:</label>
-                    <input type="date" id="assignment-date" name="assignment-date" required>
-                    
-                    <!-- Submit Button -->
-                    <button type="submit">Submit Assignment</button>
+                    <label for="assignment-description">Description:</label>
+                    <textarea id="assignment-description" name="assignment-description" rows="5" required></textarea>
+
+                    <label for="assignment-due-date">Due Date:</label>
+                    <input type="date" id="assignment-due-date" name="assignment-due-date" required>
+
+                    <label for="assignment-files">Attached File URLs (one per line):</label>
+                    <textarea id="assignment-files" name="assignment-files" rows="3"></textarea>
+
+                    <button type="submit" id="add-assignment">Add Assignment</button>
                 </fieldset>
             </form>
         </section>
 
         <!-- ============================================================
-              Current Assignments List (CRUD - Read/Update/Delete)
+              Existing Assignments Table
              ============================================================ -->
         <section>
             <h2>Current Assignments</h2>
-            <div id="assignment-list">
-                <!-- Data will be populated here via admin.js -->
-            </div>
+            <table id="assignments-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Due Date</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="assignments-tbody">
+                    <!-- admin.js will inject <tr> rows here -->
+                </tbody>
+            </table>
         </section>
     </main>
-
 </body>
 </html>
