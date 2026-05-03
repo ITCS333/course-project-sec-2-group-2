@@ -1,8 +1,4 @@
-<!--
-Requirement: Create the Admin View for Assignments
--->
-
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <!-- Character encoding -->
@@ -16,87 +12,53 @@ Requirement: Create the Admin View for Assignments
 
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- Required: link admin.js with defer. -->
+    <script src="admin.js" defer></script>
 </head>
 <body>
 
-    <!-- Header -->
+    <!-- Header containing h1 -->
     <header>
         <h1>Manage Assignments</h1>
     </header>
 
+    <!-- Main content area -->
     <main>
-
-        <!-- Section 1: Add/Edit Assignment Form -->
+        <!-- ============================================================
+              Add / Edit Assignment Form
+             ============================================================ -->
         <section>
             <h2>Add a New Assignment</h2>
-
+            <!-- form id="assignment-form" required by admin.js -->
             <form id="assignment-form" action="#">
                 <fieldset>
                     <legend>Assignment Details</legend>
+                    
+                    <!-- Title Input -->
+                    <label for="assignment-title">Title:</label>
+                    <input type="text" id="assignment-title" name="assignment-title" required>
 
-                    <!-- Title -->
-                    <label for="assignment-title">Title</label>
-                    <input id="assignment-title" type="text" required>
-
-                    <!-- Description -->
-                    <label for="assignment-description">Description</label>
-                    <textarea id="assignment-description" rows="5" required></textarea>
-
-                    <!-- Due Date -->
-                    <label for="assignment-due-date">Due Date</label>
-                    <input id="assignment-due-date" type="date" required>
-
-                    <!-- Files -->
-                    <label for="assignment-files">Files / Links (one per line)</label>
-                    <textarea id="assignment-files" rows="3"></textarea>
-
-                    <!-- Submit -->
-                    <button id="add-assignment" type="submit">Add Assignment</button>
-
+                    <!-- Due Date Input -->
+                    <label for="assignment-date">Due Date:</label>
+                    <input type="date" id="assignment-date" name="assignment-date" required>
+                    
+                    <!-- Submit Button -->
+                    <button type="submit">Submit Assignment</button>
                 </fieldset>
             </form>
         </section>
 
-        <!-- Section 2: Existing Assignments -->
+        <!-- ============================================================
+              Current Assignments List (CRUD - Read/Update/Delete)
+             ============================================================ -->
         <section>
             <h2>Current Assignments</h2>
-
-            <table id="assignments-table">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Due Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-
-                <tbody id="assignments-tbody">
-                    <!-- Dummy row 1 -->
-                    <tr>
-                        <td>HTML Basics</td>
-                        <td>2025-11-10</td>
-                        <td>
-                            <button class="edit-btn">Edit</button>
-                            <button class="delete-btn">Delete</button>
-                        </td>
-                    </tr>
-
-                    <!-- Dummy row 2 -->
-                    <tr>
-                        <td>CSS Styling</td>
-                        <td>2025-11-17</td>
-                        <td>
-                            <button class="edit-btn">Edit</button>
-                            <button class="delete-btn">Delete</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div id="assignment-list">
+                <!-- Data will be populated here via admin.js -->
+            </div>
         </section>
-
     </main>
 
-    <!-- Link JS -->
-    <script src="admin.js" defer></script>
 </body>
 </html>
