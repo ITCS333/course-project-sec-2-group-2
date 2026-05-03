@@ -1,91 +1,171 @@
-/*
-Requirement: Make the "Manage Assignments" page interactive.
-*/
 // --- Global Data Store ---
 let assignments = [];
 
 // --- Element Selections ---
-const assignmentForm = document.querySelector("#assignment-form");
-const assignmentsTableBody = document.querySelector("#assignments-tbody");
+const assignmentForm = document.getElementById('assignment-form');
+const assignmentsTbody = document.getElementById('assignments-tbody');
+const submitBtn = document.getElementById('add-assignment');
 
 // --- Functions ---
 
-// Create a row <tr> for one assignment
+/**
+ * Creates a table row for a single assignment.
+ */
 function createAssignmentRow(assignment) {
-  const { id, title, dueDate } = assignment;
+  const tr = document.createElement('tr');
 
-  const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td>${title}</td>
-    <td>${dueDate}</td>
+    <td>${assignment.title}</td>
+    <td>${assignment.due_date}</td>
+    <td>${assignment.description}</td>
     <td>
-        <button class="edit-btn" data-id="${id}">Edit</button>
-        <button class="delete-btn" data-id="${id}">Delete</button>
+      <button class="edit-btn" data-id="${assignment.id}">Edit</button>
+      <button class="delete-btn" data-id="${assignment.id}">Delete</button>
     </td>
   `;
+
   return tr;
 }
 
-// Render the table by clearing and re-appending rows
+/**
+ * Clears and repopulates the assignments table.
+ */
 function renderTable() {
-  assignmentsTableBody.innerHTML = "";
-
+  assignmentsTbody.innerHTML = "";
   assignments.forEach(assignment => {
     const row = createAssignmentRow(assignment);
-    assignmentsTableBody.appendChild(row);
+    assignmentsTbody.appendChild(row);
   });
 }
 
-// Handle adding a new assignment
-function handleAddAssignment(event) {
+/**
+ * Handles form submission for both adding and updating assignments.
+ */
+async function handleAddAssignment(event) {
   event.preventDefault();
 
-  const title = document.querySelector("#assignment-title").value.trim();
-  const description = document.querySelector("#assignment-description").value.trim();
-  const dueDate = document.querySelector("#assignment-due-date").value;
-  const filesRaw = document.querySelector("#assignment-files").value.trim();
+  const title = document.getElementById('assignment-title').value;
+  const due_date = document.getElementById('assignment-due-date').value;
+  const description = document.getElementById('assignment-description').value;
+  const filesRaw = document.getElementById('assignment-files').value;
+  
+  // Split by newline and filter out empty strings
+  const files = filesRaw.split('\n').map(f => f.trim()).filter(f => f !== "");
 
-  const files = filesRaw ? filesRaw.split("\n") : [];
+  const editId = submitBtn.getAttribute('data-edit-id');
 
-  const newAssignment = {
-    id: `asg_${Date.now()}`,
-    title,
-    description,
-    dueDate,
-    files
-  };
+  if (editId) {
+    // Update Mode
+    await handleUpdateAssignment(parseInt(editId), { title, due_date, description, files });
+  } else {
+    // Add Mode
+    try {
+      const response = await fetch('./api/index.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, due_date, description, files })
+      });
+      const result = await response.json();
 
-  assignments.push(newAssignment);
-  renderTable();
-  assignmentForm.reset();
+      if (result.success) {
+        // Add new assignment to global store with returned ID
+        assignments.push({ id: result.id, title, due_date, description, files });
+        renderTable();
+        assignmentForm.reset();
+      }
+    } catch (error) {
+      console.error("Error adding assignment:", error);
+    }
+  }
 }
 
-// Handle delete button click (event delegation)
-function handleTableClick(event) {
-  if (!event.target.classList.contains("delete-btn")) return;
+/**
+ * Sends a PUT request to update an existing assignment.
+ */
+async function handleUpdateAssignment(id, fields) {
+  try {
+    const response = await fetch('./api/index.php', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...fields })
+    });
+    const result = await response.json();
 
-  const id = event.target.getAttribute("data-id");
+    if (result.success) {
+      // Update entry in local array
+      const index = assignments.findIndex(a => a.id === id);
+      if (index !== -1) {
+        assignments[index] = { id, ...fields };
+      }
 
-  assignments = assignments.filter(a => a.id !== id);
-
-  renderTable();
+      renderTable();
+      assignmentForm.reset();
+      
+      // Restore button state
+      submitBtn.textContent = "Add Assignment";
+      submitBtn.removeAttribute('data-edit-id');
+    }
+  } catch (error) {
+    console.error("Error updating assignment:", error);
+  }
 }
 
-// Load initial JSON and initialize the page
+/**
+ * Handles clicks on the table body (Edit and Delete buttons).
+ */
+async function handleTableClick(event) {
+  const id = parseInt(event.target.dataset.id);
+  if (!id) return;
+
+  if (event.target.classList.contains('delete-btn')) {
+    // DELETE Logic
+    try {
+      const response = await fetch(`./api/index.php?id=${id}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (result.success) {
+        assignments = assignments.filter(a => a.id !== id);
+        renderTable();
+      }
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+    }
+  } 
+  
+  else if (event.target.classList.contains('edit-btn')) {
+    // EDIT Logic: Populate form
+    const assignment = assignments.find(a => a.id === id);
+    if (assignment) {
+      document.getElementById('assignment-title').value = assignment.title;
+      document.getElementById('assignment-due-date').value = assignment.due_date;
+      document.getElementById('assignment-description').value = assignment.description;
+      document.getElementById('assignment-files').value = assignment.files.join('\n');
+
+      submitBtn.textContent = "Update Assignment";
+      submitBtn.setAttribute('data-edit-id', id);
+    }
+  }
+}
+
+/**
+ * Fetches initial data and sets up event listeners.
+ */
 async function loadAndInitialize() {
   try {
-    const response = await fetch("assignments.json");
-    assignments = await response.json();
-  } catch (e) {
-    console.log("⚠ Could not load assignments.json — starting empty.");
-    assignments = [];
+    const response = await fetch('./api/index.php');
+    const result = await response.json();
+
+    if (result.success) {
+      assignments = result.data;
+      renderTable();
+    }
+  } catch (error) {
+    console.error("Error loading assignments:", error);
   }
 
-  renderTable();
-
-  assignmentForm.addEventListener("submit", handleAddAssignment);
-  assignmentsTableBody.addEventListener("click", handleTableClick);
+  // Attach Event Listeners
+  assignmentForm.addEventListener('submit', handleAddAssignment);
+  assignmentsTbody.addEventListener('click', handleTableClick);
 }
 
-// Initial load
+// --- Initial Page Load ---
 loadAndInitialize();
