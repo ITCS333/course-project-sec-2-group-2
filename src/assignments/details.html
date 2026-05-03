@@ -1,76 +1,56 @@
-<!--
-Requirement: Create the Dedicated Page for a Single Assignment
--->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Meta tags -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Title -->
     <title>Assignment Details</title>
-
-    <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
+    <!-- Required: link details.js with defer -->
+    <script src="details.js" defer></script>
 </head>
 <body>
-
-    <!-- Header -->
     <header>
-        <h1 id="assignment-title">Assignment 1: HTML Basics</h1>
+        <!-- details.js will set textContent here -->
+        <h1 id="assignment-title"></h1>
     </header>
 
     <main>
-
         <!-- Section 1: Assignment Information -->
         <article>
-            <p id="assignment-due-date">Due: 2025-11-20</p>
-
+            <p id="assignment-due-date"></p>
+            
             <h2>Description</h2>
-            <p id="assignment-description">
-                This is a dummy description for the HTML Basics assignment.
-            </p>
+            <p id="assignment-description"></p>
 
-            <h2>Attached Files & Links</h2>
+            <h2>Attached Files &amp; Links</h2>
             <ul id="assignment-files-list">
-                <li><a href="#">assignment-brief.pdf</a></li>
-                <li><a href="#">example-code.zip</a></li>
+                <!-- details.js will inject <li> items here -->
             </ul>
         </article>
 
         <!-- Section 2: Discussion Forum -->
         <section id="discussion-forum">
-            <h2>Questions & Discussion</h2>
+            <h2>Questions &amp; Discussion</h2>
 
-            <!-- Existing comments -->
+            <!-- Subsection 2.1: Existing Comments -->
             <div id="comment-list">
-                <article>
-                    <p>Is it okay to use a 'section' inside an 'article'?</p>
-                    <footer>Posted by: Jane Smith</footer>
-                </article>
-
-                <article>
-                    <p>Can we submit as a ZIP file?</p>
-                    <footer>Posted by: Ahmed Ali</footer>
-                </article>
+                <!-- details.js will inject <article> comments here -->
             </div>
 
-            <!-- Add Comment Form -->
+            <!-- Subsection 2.2: Add a Comment Form -->
             <form id="comment-form" action="#">
                 <fieldset>
                     <legend>Ask a Question</legend>
-
-                    <label for="new-comment-text">Your Comment</label>
-                    <textarea id="new-comment-text" required></textarea>
+                    
+                    <label for="new-comment">Your Comment:</label>
+                    <!-- ID must be exactly "new-comment" -->
+                    <textarea id="new-comment" required></textarea>
 
                     <button type="submit">Post Comment</button>
                 </fieldset>
             </form>
         </section>
-
     </main>
-
-    <script src="details.js" defer></script>
 </body>
 </html>
+
