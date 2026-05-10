@@ -35,16 +35,16 @@ function renderTable(userArray) {
 async function handleChangePassword(event) {
     event.preventDefault();
 
-    const current_password = document.getElementById("current-password").value;
-    const new_password = document.getElementById("new-password").value;
-    const confirm_password = document.getElementById("confirm-password").value;
+    const current = document.getElementById("current-password");
+    const newPass = document.getElementById("new-password");
+    const confirm = document.getElementById("confirm-password");
 
-    if (new_password !== confirm_password) {
+    if (newPass.value !== confirm.value) {
         alert("Passwords do not match.");
         return;
     }
 
-    if (new_password.length < 8) {
+    if (newPass.value.length < 8) {
         alert("Password must be at least 8 characters.");
         return;
     }
@@ -54,8 +54,8 @@ async function handleChangePassword(event) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             id: 1,
-            current_password,
-            new_password
+            current_password: current.value,
+            new_password: newPass.value
         })
     });
 
@@ -63,7 +63,10 @@ async function handleChangePassword(event) {
 
     if (res.ok) {
         alert("Password updated successfully!");
-        passwordForm.reset();
+
+        current.value = "";
+        newPass.value = "";
+        confirm.value = "";
     } else {
         alert(data.message);
     }
