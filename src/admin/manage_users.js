@@ -81,7 +81,9 @@ function handleChangePassword(event) {
     .then(data => {
       if (data.success) {
         alert("Password updated successfully!");
-        event.target.reset();
+document.getElementById("current-password").value = "";
+document.getElementById("new-password").value = "";
+document.getElementById("confirm-password").value = "";
       } else {
         alert(data.message);
       }
@@ -226,9 +228,9 @@ async function loadUsersAndInitialize() {
     addUserForm.addEventListener("submit", handleAddUser, { once: true });
     userTableBody.addEventListener("click", handleTableClick, { once: true });
     searchInput.addEventListener("input", handleSearch, { once: true });
-    tableHeaders.forEach(th => {
-      th.addEventListener("click", handleSort, { once: true });
-    });
+tableHeaders.forEach(th => {
+  th.addEventListener("click", handleSort);
+});
   } catch (error) {
     console.error(error);
     alert("Something went wrong");
