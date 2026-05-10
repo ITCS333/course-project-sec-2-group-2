@@ -32,43 +32,50 @@ function renderTable(userArray) {
     });
 }
 
-async function handleChangePassword(event) {
+function handleChangePassword(event) {
   event.preventDefault();
 
-  const current = document.getElementById("current-password");
-  const newPass = document.getElementById("new-password");
-  const confirm = document.getElementById("confirm-password");
+  const currentPassword = document.getElementById("current-password").value.trim();
+  const newPassword = document.getElementById("new-password").value.trim();
+  const confirmPassword = document.getElementById("confirm-password").value.trim();
 
-  if (newPass.value !== confirm.value) {
+  const id = window.adminId; 
+
+  if (newPassword !== confirmPassword) {
     alert("Passwords do not match.");
     return;
   }
 
-  if (newPass.value.length < 8) {
+  if (newPassword.length < 8) {
     alert("Password must be at least 8 characters.");
     return;
   }
 
-  const res = await fetch("../api/index.php?action=change_password", {
+  fetch("../api/index.php?action=change_password", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
-      id: 1,
-      current_password: current.value,
-      new_password: newPass.value
+      id: id,
+      current_password: currentPassword,
+      new_password: newPassword
     })
-  });
-
-  const data = await res.json();
-
-  if (res.ok && data.success) {
-    alert("Password updated successfully!");
-    current.value = "";
-    newPass.value = "";
-    confirm.value = "";
-  } else {
-    alert(data.message || "Failed to update password");
-  }
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert("Password updated successfully!");
+        document.getElementById("current-password").value = "";
+        document.getElementById("new-password").value = "";
+        document.getElementById("confirm-password").value = "";
+      } else {
+        alert(data.message || "An error occurred while updating the password.");
+      }
+    })
+    .catch(error => {
+      alert("Error: " + error.message);
+    });
 }
 
 async function handleAddUser(event) {
