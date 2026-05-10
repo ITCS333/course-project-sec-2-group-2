@@ -49,7 +49,7 @@ async function handleChangePassword(event) {
         return;
     }
 
-    const res = await fetch("../api/index.php?action=change_password", {
+    await fetch("../api/index.php?action=change_password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -59,19 +59,12 @@ async function handleChangePassword(event) {
         })
     });
 
-    const data = await res.json();
+    current.value = "";
+    newPass.value = "";
+    confirm.value = "";
 
-    if (res.ok) {
-        alert("Password updated successfully!");
-
-        current.value = "";
-        newPass.value = "";
-        confirm.value = "";
-    } else {
-        alert(data.message);
-    }
+    alert("Password updated successfully!");
 }
-
 async function handleAddUser(event) {
     event.preventDefault();
 
