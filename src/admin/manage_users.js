@@ -1,52 +1,50 @@
-/*
-  Requirement: Add interactivity and data management to the Admin Portal.
-
-  Instructions:
-  1. This file is loaded by the <script src="manage_users.js" defer> tag in manage_users.html.
-     The 'defer' attribute guarantees the DOM is fully parsed before this script runs.
-  2. Implement the JavaScript functionality as described in the TODO comments.
-  3. All data is fetched from and written to the PHP API at '../api/index.php'.
-     The local 'users' array is used only as a client-side cache for search and sort.
-*/
-
 // --- Global Data Store ---
-// This array will be populated with data fetched from the PHP API.
-// It acts as a client-side cache so search and sort work without extra network calls.
 let users = [];
 
 // --- Element Selections ---
-
 const userTableBody = document.getElementById("user-table-body");
-
 const addUserForm = document.getElementById("add-user-form");
-
 const passwordForm = document.getElementById("password-form");
-
 const searchInput = document.getElementById("search-input");
-
 const tableHeaders = document.querySelectorAll("#user-table thead th");
 
 // --- Functions ---
-
 function createUserRow(user) {
   const tr = document.createElement("tr");
 
-  tr.innerHTML = `
-    <td>${user.name}</td>
-    <td>${user.email}</td>
-    <td>${user.is_admin == 1 ? "Yes" : "No"}</td>
-    <td>
-      <button class="edit-btn" data-id="${user.id}">Edit</button>
-      <button class="delete-btn" data-id="${user.id}">Delete</button>
-    </td>
-  `;
+  const nameTd = document.createElement("td");
+  nameTd.textContent = user.name;
+  tr.appendChild(nameTd);
+
+  const emailTd = document.createElement("td");
+  emailTd.textContent = user.email;
+  tr.appendChild(emailTd);
+
+  const adminTd = document.createElement("td");
+  adminTd.textContent = user.is_admin === 1 ? "Yes" : "No";
+  tr.appendChild(adminTd);
+
+  const editTd = document.createElement("td");
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "Edit";
+  editBtn.classList.add("edit-btn");
+  editBtn.dataset.id = user.id;
+  editTd.appendChild(editBtn);
+  tr.appendChild(editTd);
+
+  const deleteTd = document.createElement("td");
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Delete";
+  deleteBtn.classList.add("delete-btn");
+  deleteBtn.dataset.id = user.id;
+  deleteTd.appendChild(deleteBtn);
+  tr.appendChild(deleteTd);
 
   return tr;
 }
 
 function renderTable(userArray) {
   userTableBody.innerHTML = "";
-
   userArray.forEach(user => {
     const row = createUserRow(user);
     userTableBody.appendChild(row);
@@ -111,24 +109,25 @@ function handleAddUser(event) {
     return;
   }
 
-  const response = await fetch("../api/index.php", {
+  fetch("../api/index.php", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name,
-      email,
-      password,
-      is_admin
+    body: JSON.stringify({ name, email, password, is_admin })
+  })
+    .then(response => {
+      if (response.status === 201) {
+        return loadUsersAndInitialize().then(() => {
+          addUserForm.reset();
+        });
+      } else {
+        return response.json().then(data => {
+          alert(data.message);
+        });
+      }
     })
-  });
-
-  if (response.status === 201) {
-    await loadUsersAndInitialize();
-    addUserForm.reset();
-  } else {
-    const data = await response.json();
-    alert(data.message);
-  }
+    .catch(error => {
+      alert("Network error: " + error.message);
+    });
 }
 
 function handleTableClick(event) {
@@ -174,7 +173,7 @@ function handleSearch(event) {
 }
 
 function handleSort(event) {
- const index = event.currentTarget.cellIndex;
+  const index = event.currentTarget.cellIndex;
 
   let key = "";
   if (index === 0) key = "name";
@@ -227,11 +226,9 @@ async function loadUsersAndInitialize() {
     addUserForm.addEventListener("submit", handleAddUser, { once: true });
     userTableBody.addEventListener("click", handleTableClick, { once: true });
     searchInput.addEventListener("input", handleSearch, { once: true });
-
     tableHeaders.forEach(th => {
       th.addEventListener("click", handleSort, { once: true });
     });
-
   } catch (error) {
     console.error(error);
     alert("Something went wrong");
