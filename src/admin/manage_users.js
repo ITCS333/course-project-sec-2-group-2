@@ -35,11 +35,15 @@ function renderTable(userArray) {
 function handleChangePassword(event) {
   event.preventDefault();
 
-  const currentPassword = document.getElementById("current-password").value.trim();
-  const newPassword = document.getElementById("new-password").value.trim();
-  const confirmPassword = document.getElementById("confirm-password").value.trim();
+  const currentPasswordInput = document.getElementById("current-password");
+  const newPasswordInput = document.getElementById("new-password");
+  const confirmPasswordInput = document.getElementById("confirm-password");
 
-  const id = window.adminId; 
+  const currentPassword = currentPasswordInput.value.trim();
+  const newPassword = newPasswordInput.value.trim();
+  const confirmPassword = confirmPasswordInput.value.trim();
+
+  const id = window.adminId;
 
   if (newPassword !== confirmPassword) {
     alert("Passwords do not match.");
@@ -51,11 +55,13 @@ function handleChangePassword(event) {
     return;
   }
 
+  currentPasswordInput.value = "";
+  newPasswordInput.value = "";
+  confirmPasswordInput.value = "";
+
   fetch("../api/index.php?action=change_password", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       id: id,
       current_password: currentPassword,
@@ -66,9 +72,6 @@ function handleChangePassword(event) {
     .then(data => {
       if (data.success) {
         alert("Password updated successfully!");
-        document.getElementById("current-password").value = "";
-        document.getElementById("new-password").value = "";
-        document.getElementById("confirm-password").value = "";
       } else {
         alert(data.message || "An error occurred while updating the password.");
       }
