@@ -33,38 +33,44 @@ function renderTable(userArray) {
 }
 
 async function handleChangePassword(event) {
-    event.preventDefault();
+  event.preventDefault();
 
-    const current = document.getElementById("current-password");
-    const newPass = document.getElementById("new-password");
-    const confirm = document.getElementById("confirm-password");
+  const current = document.getElementById("current-password");
+  const newPass = document.getElementById("new-password");
+  const confirm = document.getElementById("confirm-password");
 
-    if (newPass.value !== confirm.value) {
-        alert("Passwords do not match.");
-        return;
-    }
+  if (newPass.value !== confirm.value) {
+    alert("Passwords do not match.");
+    return;
+  }
 
-    if (newPass.value.length < 8) {
-        alert("Password must be at least 8 characters.");
-        return;
-    }
+  if (newPass.value.length < 8) {
+    alert("Password must be at least 8 characters.");
+    return;
+  }
 
-    await fetch("../api/index.php?action=change_password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            id: 1,
-            current_password: current.value,
-            new_password: newPass.value
-        })
-    });
+  const res = await fetch("../api/index.php?action=change_password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: 1,
+      current_password: current.value,
+      new_password: newPass.value
+    })
+  });
 
+  const data = await res.json();
+
+  if (res.ok && data.success) {
+    alert("Password updated successfully!");
     current.value = "";
     newPass.value = "";
     confirm.value = "";
-
-    alert("Password updated successfully!");
+  } else {
+    alert(data.message || "Failed to update password");
+  }
 }
+
 async function handleAddUser(event) {
     event.preventDefault();
 
