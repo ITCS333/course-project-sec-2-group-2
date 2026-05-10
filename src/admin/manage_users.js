@@ -10,234 +10,164 @@ const tableHeaders = document.querySelectorAll("#user-table thead th");
 
 // --- Functions ---
 function createUserRow(user) {
-  const tr = document.createElement("tr");
+    const tr = document.createElement("tr");
 
-  const nameTd = document.createElement("td");
-  nameTd.textContent = user.name;
-  tr.appendChild(nameTd);
+    tr.innerHTML = `
+        <td>${user.name}</td>
+        <td>${user.email}</td>
+        <td>${user.is_admin == 1 ? "Yes" : "No"}</td>
+        <td>
+            <button class="edit-btn" data-id="${user.id}">Edit</button>
+            <button class="delete-btn" data-id="${user.id}">Delete</button>
+        </td>
+    `;
 
-  const emailTd = document.createElement("td");
-  emailTd.textContent = user.email;
-  tr.appendChild(emailTd);
-
-  const adminTd = document.createElement("td");
-  adminTd.textContent = user.is_admin === 1 ? "Yes" : "No";
-  tr.appendChild(adminTd);
-
-  const editTd = document.createElement("td");
-  const editBtn = document.createElement("button");
-  editBtn.textContent = "Edit";
-  editBtn.classList.add("edit-btn");
-  editBtn.dataset.id = user.id;
-  editTd.appendChild(editBtn);
-  tr.appendChild(editTd);
-
-  const deleteTd = document.createElement("td");
-  const deleteBtn = document.createElement("button");
-  deleteBtn.textContent = "Delete";
-  deleteBtn.classList.add("delete-btn");
-  deleteBtn.dataset.id = user.id;
-  deleteTd.appendChild(deleteBtn);
-  tr.appendChild(deleteTd);
-
-  return tr;
+    return tr;
 }
 
 function renderTable(userArray) {
-  userTableBody.innerHTML = "";
-  userArray.forEach(user => {
-    const row = createUserRow(user);
-    userTableBody.appendChild(row);
-  });
+    userTableBody.innerHTML = "";
+    userArray.forEach(user => {
+        userTableBody.appendChild(createUserRow(user));
+    });
 }
 
-function handleChangePassword(event) {
-  event.preventDefault();
+async function handleChangePassword(event) {
+    event.preventDefault();
 
-  const currentPassword = document.getElementById("current-password").value.trim();
-  const newPassword = document.getElementById("new-password").value.trim();
-  const confirmPassword = document.getElementById("confirm-password").value.trim();
+    const current_password = document.getElementById("current-password").value;
+    const new_password = document.getElementById("new-password").value;
+    const confirm_password = document.getElementById("confirm-password").value;
 
-  if (newPassword !== confirmPassword) {
-    alert("Passwords do not match.");
-    return;
-  }
+    if (new_password !== confirm_password) {
+        alert("Passwords do not match.");
+        return;
+    }
 
-  if (newPassword.length < 8) {
-    alert("Password must be at least 8 characters.");
-    return;
-  }
+    if (new_password.length < 8) {
+        alert("Password must be at least 8 characters.");
+        return;
+    }
 
-  fetch("../api/index.php?action=change_password", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      id: 1,
-      current_password: currentPassword,
-      new_password: newPassword
-    })
-  })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
+    const res = await fetch("../api/index.php?action=change_password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            id: 1,
+            current_password,
+            new_password
+        })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
         alert("Password updated successfully!");
-
-        document.getElementById("current-password").value = "";
-        document.getElementById("new-password").value = "";
-        document.getElementById("confirm-password").value = "";
-      } else {
+        passwordForm.reset();
+    } else {
         alert(data.message);
-      }
-    })
-    .catch(error => {
-      alert("Network error: " + error.message);
-    });
+    }
 }
 
-function handleAddUser(event) {
-  event.preventDefault();
+async function handleAddUser(event) {
+    event.preventDefault();
 
-  const name = document.getElementById("user-name").value.trim();
-  const email = document.getElementById("user-email").value.trim();
-  const password = document.getElementById("default-password").value.trim();
-  const is_admin = document.getElementById("is-admin").value;
+    const name = document.getElementById("user-name").value;
+    const email = document.getElementById("user-email").value;
+    const password = document.getElementById("default-password").value;
+    const is_admin = document.getElementById("is-admin").checked ? 1 : 0;
 
-  if (!name || !email || !password) {
-    alert("Please fill out all required fields.");
-    return;
-  }
+    if (!name || !email || !password) {
+        alert("Please fill out all required fields.");
+        return;
+    }
 
-  if (password.length < 8) {
-    alert("Password must be at least 8 characters.");
-    return;
-  }
+    if (password.length < 8) {
+        alert("Password must be at least 8 characters.");
+        return;
+    }
 
-  fetch("../api/index.php", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email, password, is_admin })
-  })
-    .then(response => {
-      if (response.status === 201) {
-        return loadUsersAndInitialize().then(() => {
-          addUserForm.reset();
-        });
-      } else {
-        return response.json().then(data => {
-          alert(data.message);
-        });
-      }
-    })
-    .catch(error => {
-      alert("Network error: " + error.message);
+    const res = await fetch("../api/index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, is_admin })
     });
+
+    if (res.status === 201) {
+        loadUsersAndInitialize();
+        addUserForm.reset();
+    } else {
+        const data = await res.json();
+        alert(data.message);
+    }
 }
 
-function handleTableClick(event) {
-  const id = event.target.dataset.id;
+async function handleTableClick(event) {
+    const id = event.target.dataset.id;
 
-  if (event.target.classList.contains("delete-btn")) {
-    fetch(`../api/index.php?id=${id}`, {
-      method: "DELETE"
-    })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          users = users.filter(u => u.id != id);
-          renderTable(users);
-        } else {
-          alert(data.message);
+    if (event.target.classList.contains("delete-btn")) {
+        const res = await fetch("../api/index.php?id=" + id, {
+            method: "DELETE"
+        });
+
+        if (res.ok) {
+            users = users.filter(u => u.id != id);
+            renderTable(users);
         }
-      })
-      .catch(error => {
-        alert("Network error: " + error.message);
-      });
-  }
-
-  if (event.target.classList.contains("edit-btn")) {
-    alert("Edit feature optional - not implemented");
-  }
+    }
 }
 
-function handleSearch(event) {
-  const term = event.target.value.toLowerCase();
+function handleSearch() {
+    const term = searchInput.value.toLowerCase();
 
-  if (!term) {
-    renderTable(users);
-    return;
-  }
+    if (!term) {
+        renderTable(users);
+        return;
+    }
 
-  const filtered = users.filter(user =>
-    user.name.toLowerCase().includes(term) ||
-    user.email.toLowerCase().includes(term)
-  );
+    const filtered = users.filter(u =>
+        u.name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term)
+    );
 
-  renderTable(filtered);
+    renderTable(filtered);
 }
 
 function handleSort(event) {
-  const index = event.currentTarget.cellIndex;
+    const index = event.currentTarget.cellIndex;
+    const dir = event.currentTarget.dataset.dir === "asc" ? "desc" : "asc";
+    event.currentTarget.dataset.dir = dir;
 
-  let key = "";
-  if (index === 0) key = "name";
-  if (index === 1) key = "email";
-  if (index === 2) key = "is_admin";
+    const keys = ["name", "email", "is_admin"];
+    const key = keys[index];
 
-  const currentDir = event.currentTarget.dataset.sortDir || "asc";
-  const newDir = currentDir === "asc" ? "desc" : "asc";
-  event.currentTarget.dataset.sortDir = newDir;
+    users.sort((a, b) => {
+        if (key === "is_admin") {
+            return dir === "asc" ? a[key] - b[key] : b[key] - a[key];
+        }
+        return dir === "asc"
+            ? a[key].localeCompare(b[key])
+            : b[key].localeCompare(a[key]);
+    });
 
-  const sorted = [...users].sort((a, b) => {
-    let valA = a[key];
-    let valB = b[key];
-
-    if (key === "name" || key === "email") {
-      return newDir === "asc"
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
-    } else {
-      return newDir === "asc"
-        ? valA - valB
-        : valB - valA;
-    }
-  });
-
-  renderTable(sorted);
+    renderTable(users);
 }
 
 async function loadUsersAndInitialize() {
-  try {
-    const response = await fetch("../api/index.php");
-
-    if (!response.ok) {
-      alert("Error loading users");
-      return;
-    }
-
-    const data = await response.json();
-
-    if (!data.success) {
-      alert("Failed to load users");
-      return;
-    }
+    const res = await fetch("../api/index.php");
+    const data = await res.json();
 
     users = data.data;
-
     renderTable(users);
-    passwordForm.addEventListener("submit", handleChangePassword);
+
     addUserForm.addEventListener("submit", handleAddUser);
+    passwordForm.addEventListener("submit", handleChangePassword);
     userTableBody.addEventListener("click", handleTableClick);
     searchInput.addEventListener("input", handleSearch);
 
     tableHeaders.forEach(th => {
-      th.addEventListener("click", handleSort);
+        th.addEventListener("click", handleSort);
     });
-
-  } catch (error) {
-    console.error(error);
-    alert("Something went wrong");
-  }
 }
-
-// --- Init ---
+// --- Initial Page Load ---
 loadUsersAndInitialize();
