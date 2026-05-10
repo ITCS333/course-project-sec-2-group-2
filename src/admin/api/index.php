@@ -31,12 +31,10 @@
  */
 
 
-header("Content-Type: application/json");
-
+header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -44,13 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 
-// TODO: Include the database connection file.
-// Assume a function getDBConnection() is available that returns a PDO instance
-// configured for the 'course' database (see schema.sql).
+require_once 'db.php';
 $db = getDBConnection();
-
-// TODO: Get the PDO database connection by calling getDBConnection().
-
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -82,26 +75,24 @@ $order = $_GET['order'] ?? null;
  */
 function getUsers($db) {
     global $search, $sort, $order;
-
-    $sql = "SELECT id, name, email, is_admin, created_at FROM users";
+    $query = "SELECT id, name, email, is_admin, created_at FROM users";
     $params = [];
 
     if ($search) {
-        $sql .= " WHERE name LIKE :search OR email LIKE :search";
-        $params['search'] = "%$search%";
+        $query .= " WHERE name LIKE :search OR email LIKE :search";
+        $params[':search'] = "%$search%";
     }
 
-    $allowed = ["name", "email", "is_admin"];
-
-    if ($sort && in_array($sort, $allowed)) {
-        $order = ($order === "desc") ? "DESC" : "ASC";
-        $sql .= " ORDER BY $sort $order";
+    $allowedSort = ['name','email','is_admin'];
+    if ($sort && in_array($sort, $allowedSort)) {
+        $order = strtolower($order) === 'desc' ? 'DESC' : 'ASC';
+        $query .= " ORDER BY $sort $order";
     }
 
-    $stmt = $db->prepare($sql);
+    $stmt = $db->prepare($query);
     $stmt->execute($params);
-
-    sendResponse($stmt->fetchAll(PDO::FETCH_ASSOC), 200);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    sendResponse($rows, 200);
 }
 
 /**
@@ -113,15 +104,10 @@ function getUsers($db) {
  */
 function getUserById($db, $id) {
     $stmt = $db->prepare("SELECT id, name, email, is_admin, created_at FROM users WHERE id = :id");
-    $stmt->execute(['id' => $id]);
-
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user) {
-        sendResponse("User not found", 404);
-    }
-
-    sendResponse($user, 200);
+    $stmt->execute([':id'=>$id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) sendResponse("User not found", 404);
+    sendResponse($row, 200);
 }
 
 /**
@@ -136,42 +122,27 @@ function getUserById($db, $id) {
  */
 function createUser($db, $data) {
     if (empty($data['name']) || empty($data['email']) || empty($data['password'])) {
-        sendResponse("Missing fields", 400);
+        sendResponse("Missing required fields", 400);
     }
 
     $name = sanitizeInput($data['name']);
     $email = sanitizeInput($data['email']);
-    $password = $data['password'];
+    $password = trim($data['password']);
+    $is_admin = isset($data['is_admin']) && $data['is_admin'] == 1 ? 1 : 0;
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        sendResponse("Invalid email", 400);
-    }
+    if (!validateEmail($email)) sendResponse("Invalid email", 400);
+    if (strlen($password) < 8) sendResponse("Password too short", 400);
 
-    if (strlen($password) < 8) {
-        sendResponse("Password too short", 400);
-    }
-
-    $check = $db->prepare("SELECT id FROM users WHERE email = :email");
-    $check->execute(['email' => $email]);
-
-    if ($check->fetch()) {
-        sendResponse("Email already exists", 409);
-    }
+    $stmt = $db->prepare("SELECT id FROM users WHERE email = :email");
+    $stmt->execute([':email'=>$email]);
+    if ($stmt->fetch()) sendResponse("Email already exists", 409);
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $is_admin = $data['is_admin'] ?? 0;
+    $stmt = $db->prepare("INSERT INTO users (name,email,password,is_admin) VALUES (:name,:email,:password,:is_admin)");
+    $ok = $stmt->execute([':name'=>$name, ':email'=>$email, ':password'=>$hash, ':is_admin'=>$is_admin]);
 
-    $stmt = $db->prepare("INSERT INTO users (name, email, password, is_admin)
-                          VALUES (:name, :email, :password, :is_admin)");
-
-    $stmt->execute([
-        'name' => $name,
-        'email' => $email,
-        'password' => $hash,
-        'is_admin' => $is_admin
-    ]);
-
-    sendResponse(["id" => $db->lastInsertId()], 201);
+    if ($ok) sendResponse(["id"=>$db->lastInsertId()], 201);
+    sendResponse("Failed to create user", 500);
 }
 
 /**
@@ -187,46 +158,40 @@ function createUser($db, $data) {
  * Note: password changes are handled by the separate changePassword endpoint.
  */
 function updateUser($db, $data) {
-    if (!isset($data['id'])) {
-        sendResponse("ID required", 400);
-    }
+    if (empty($data['id'])) sendResponse("Missing user id", 400);
 
-    $id = $data['id'];
-
-    $stmt = $db->prepare("SELECT * FROM users WHERE id = :id");
-    $stmt->execute(['id' => $id]);
-
-    if (!$stmt->fetch()) {
-        sendResponse("User not found", 404);
-    }
+    $stmt = $db->prepare("SELECT id FROM users WHERE id = :id");
+    $stmt->execute([':id'=>$data['id']]);
+    if (!$stmt->fetch()) sendResponse("User not found", 404);
 
     $fields = [];
-    $params = ['id' => $id];
+    $params = [':id'=>$data['id']];
 
     if (!empty($data['name'])) {
         $fields[] = "name = :name";
-        $params['name'] = sanitizeInput($data['name']);
+        $params[':name'] = sanitizeInput($data['name']);
     }
-
     if (!empty($data['email'])) {
-        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            sendResponse("Invalid email", 400);
-        }
+        if (!validateEmail($data['email'])) sendResponse("Invalid email", 400);
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = :email AND id != :id");
+        $stmt->execute([':email'=>$data['email'], ':id'=>$data['id']]);
+        if ($stmt->fetch()) sendResponse("Email already exists", 409);
         $fields[] = "email = :email";
-        $params['email'] = $data['email'];
+        $params[':email'] = sanitizeInput($data['email']);
     }
-
     if (isset($data['is_admin'])) {
         $fields[] = "is_admin = :is_admin";
-        $params['is_admin'] = $data['is_admin'];
+        $params[':is_admin'] = $data['is_admin'] == 1 ? 1 : 0;
     }
 
-    $sql = "UPDATE users SET " . implode(",", $fields) . " WHERE id = :id";
+    if (!$fields) sendResponse("No fields to update", 200);
 
+    $sql = "UPDATE users SET ".implode(", ",$fields)." WHERE id = :id";
     $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    $ok = $stmt->execute($params);
 
-    sendResponse("User updated", 200);
+    if ($ok) sendResponse("User updated", 200);
+    sendResponse("Failed to update", 500);
 }
 
 /**
@@ -237,21 +202,16 @@ function updateUser($db, $data) {
  *   - id (int, required) : primary key of the user to delete
  */
 function deleteUser($db, $id) {
-    if (!$id) {
-        sendResponse("ID required", 400);
-    }
+    if (!$id) sendResponse("Missing id", 400);
 
-    $check = $db->prepare("SELECT id FROM users WHERE id = :id");
-    $check->execute(['id' => $id]);
-
-    if (!$check->fetch()) {
-        sendResponse("User not found", 404);
-    }
+    $stmt = $db->prepare("SELECT id FROM users WHERE id = :id");
+    $stmt->execute([':id'=>$id]);
+    if (!$stmt->fetch()) sendResponse("User not found", 404);
 
     $stmt = $db->prepare("DELETE FROM users WHERE id = :id");
-    $stmt->execute(['id' => $id]);
-
-    sendResponse("User deleted", 200);
+    $ok = $stmt->execute([':id'=>$id]);
+    if ($ok) sendResponse("User deleted", 200);
+    sendResponse("Failed to delete", 500);
 }
 
 /**
@@ -264,36 +224,25 @@ function deleteUser($db, $id) {
  *   - new_password     (string, required) : plaintext; will be hashed before storage
  */
 function changePassword($db, $data) {
-    if (!isset($data['id'], $data['current_password'], $data['new_password'])) {
+    if (empty($data['id']) || empty($data['current_password']) || empty($data['new_password'])) {
         sendResponse("Missing fields", 400);
     }
-
-    if (strlen($data['new_password']) < 8) {
-        sendResponse("Password too short", 400);
-    }
+    if (strlen($data['new_password']) < 8) sendResponse("New password too short", 400);
 
     $stmt = $db->prepare("SELECT password FROM users WHERE id = :id");
-    $stmt->execute(['id' => $data['id']]);
+    $stmt->execute([':id'=>$data['id']]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) sendResponse("User not found", 404);
 
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user) {
-        sendResponse("User not found", 404);
-    }
-
-    if (!password_verify($data['current_password'], $user['password'])) {
-        sendResponse("Wrong password", 401);
+    if (!password_verify($data['current_password'], $row['password'])) {
+        sendResponse("Unauthorized", 401);
     }
 
     $hash = password_hash($data['new_password'], PASSWORD_DEFAULT);
-
     $stmt = $db->prepare("UPDATE users SET password = :password WHERE id = :id");
-    $stmt->execute([
-        'password' => $hash,
-        'id' => $data['id']
-    ]);
-
-    sendResponse("Password updated", 200);
+    $ok = $stmt->execute([':password'=>$hash, ':id'=>$data['id']]);
+    if ($ok) sendResponse("Password changed", 200);
+    sendResponse("Failed to change password", 500);
 }
 
 
