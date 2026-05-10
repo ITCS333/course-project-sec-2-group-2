@@ -81,9 +81,10 @@ function handleChangePassword(event) {
     .then(data => {
       if (data.success) {
         alert("Password updated successfully!");
-document.getElementById("current-password").value = "";
-document.getElementById("new-password").value = "";
-document.getElementById("confirm-password").value = "";
+
+        document.getElementById("current-password").value = "";
+        document.getElementById("new-password").value = "";
+        document.getElementById("confirm-password").value = "";
       } else {
         alert(data.message);
       }
@@ -186,7 +187,7 @@ function handleSort(event) {
   const newDir = currentDir === "asc" ? "desc" : "asc";
   event.currentTarget.dataset.sortDir = newDir;
 
-  users.sort((a, b) => {
+  const sorted = [...users].sort((a, b) => {
     let valA = a[key];
     let valB = b[key];
 
@@ -201,7 +202,7 @@ function handleSort(event) {
     }
   });
 
-  renderTable(users);
+  renderTable(sorted);
 }
 
 async function loadUsersAndInitialize() {
@@ -223,19 +224,20 @@ async function loadUsersAndInitialize() {
     users = data.data;
 
     renderTable(users);
+    passwordForm.addEventListener("submit", handleChangePassword);
+    addUserForm.addEventListener("submit", handleAddUser);
+    userTableBody.addEventListener("click", handleTableClick);
+    searchInput.addEventListener("input", handleSearch);
 
-    passwordForm.addEventListener("submit", handleChangePassword, { once: true });
-    addUserForm.addEventListener("submit", handleAddUser, { once: true });
-    userTableBody.addEventListener("click", handleTableClick, { once: true });
-    searchInput.addEventListener("input", handleSearch, { once: true });
-tableHeaders.forEach(th => {
-  th.addEventListener("click", handleSort);
-});
+    tableHeaders.forEach(th => {
+      th.addEventListener("click", handleSort);
+    });
+
   } catch (error) {
     console.error(error);
     alert("Something went wrong");
   }
 }
 
-// --- Initial Page Load ---
+// --- Init ---
 loadUsersAndInitialize();
