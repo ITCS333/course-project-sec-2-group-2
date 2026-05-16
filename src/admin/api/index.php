@@ -24,7 +24,6 @@ $action = $_GET['action'] ?? null;
 
 function getUsers($db) {
 
-    // 🔥 FIX: بدل global نقرأ مباشرة
     $search = $_GET['search'] ?? null;
     $sort   = $_GET['sort'] ?? null;
     $order  = $_GET['order'] ?? null;
