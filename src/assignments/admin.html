@@ -1,65 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Meta tag for character encoding -->
     <meta charset="UTF-8">
+    <!-- Responsive viewport meta tag -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Title -->
     <title>Manage Assignments</title>
-    <!-- Add your CSS stylesheet here -->
-    <link rel="stylesheet" href="style.css">
-    <!-- Required: link admin.js with defer -->
-    <script src="admin.js" defer></script>
+    <!-- Link to your CSS framework or stylesheet (e.g., Tailwind CSS) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <header>
-        <h1>Manage Assignments</h1>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <!-- Header -->
+    <header class="bg-white shadow p-6 mb-6">
+        <h1 class="text-3xl font-bold">Manage Assignments</h1>
     </header>
 
-    <main>
-        <!-- ============================================================
-              Add / Edit Assignment Form
-             ============================================================ -->
-        <section>
-            <h2>Add a New Assignment</h2>
-            <form id="assignment-form" action="#">
+    <!-- Main content area -->
+    <main class="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Section 1: Add/Edit Assignment Form -->
+        <section class="lg:col-span-1 bg-white p-6 rounded-lg shadow">
+            <h2 class="text-xl font-semibold mb-4">Add a New Assignment</h2>
+            
+            <form id="assignment-form" action="#" method="POST">
                 <fieldset>
-                    <legend>Assignment Details</legend>
+                    <legend class="text-gray-600 text-sm mb-4">Assignment Details</legend>
                     
-                    <label for="assignment-title">Title:</label>
-                    <input type="text" id="assignment-title" name="assignment-title" required>
+                    <!-- Title -->
+                    <div class="mb-4">
+                        <label for="assignment-title" class="block text-sm font-medium text-gray-700">Title</label>
+                        <input id="assignment-title" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
 
-                    <label for="assignment-description">Description:</label>
-                    <textarea id="assignment-description" name="assignment-description" rows="5" required></textarea>
+                    <!-- Description -->
+                    <div class="mb-4">
+                        <label for="assignment-description" class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea id="assignment-description" rows="5" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
 
-                    <label for="assignment-due-date">Due Date:</label>
-                    <input type="date" id="assignment-due-date" name="assignment-due-date" required>
+                    <!-- Due Date -->
+                    <div class="mb-4">
+                        <label for="assignment-due-date" class="block text-sm font-medium text-gray-700">Due Date</label>
+                        <input id="assignment-due-date" type="date" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
 
-                    <label for="assignment-files">Attached File URLs (one per line):</label>
-                    <textarea id="assignment-files" name="assignment-files" rows="3"></textarea>
+                    <!-- Attached Files or Links -->
+                    <div class="mb-6">
+                        <label for="assignment-files" class="block text-sm font-medium text-gray-700">Attached Files or Links (one per line)</label>
+                        <textarea id="assignment-files" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="https://example.com"></textarea>
+                    </div>
 
-                    <button type="submit" id="add-assignment">Add Assignment</button>
+                    <!-- Submit Button -->
+                    <button id="add-assignment" type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition">Add Assignment</button>
                 </fieldset>
             </form>
         </section>
 
-        <!-- ============================================================
-              Existing Assignments Table
-             ============================================================ -->
-        <section>
-            <h2>Current Assignments</h2>
-            <table id="assignments-table">
-                <thead>
+        <!-- Section 2: Existing Assignments List -->
+        <section class="lg:col-span-2 bg-white p-6 rounded-lg shadow overflow-x-auto">
+            <h2 class="text-xl font-semibold mb-4">Current Assignments</h2>
+            
+            <table id="assignments-table" class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
                     <tr>
-                        <th>Title</th>
-                        <th>Due Date</th>
-                        <th>Description</th>
-                        <th>Actions</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="assignments-tbody">
-                    <!-- admin.js will inject <tr> rows here -->
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <!-- Dummy Data: Row 1 -->
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">HTML Basics</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2026-05-25</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button class="text-indigo-600 hover:text-indigo-900 mr-4 font-semibold">Edit</button>
+                            <button class="text-red-600 hover:text-red-900 font-semibold">Delete</button>
+                        </td>
+                    </tr>
+                    
+                    <!-- Dummy Data: Row 2 -->
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">CSS Flexbox</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2026-06-01</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button class="text-indigo-600 hover:text-indigo-900 mr-4 font-semibold">Edit</button>
+                            <button class="text-red-600 hover:text-red-900 font-semibold">Delete</button>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </section>
+
     </main>
+
 </body>
 </html>
