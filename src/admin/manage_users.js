@@ -87,7 +87,7 @@ async function handleAddUser(event) {
     const name = document.getElementById("user-name").value;
     const email = document.getElementById("user-email").value;
     const password = document.getElementById("default-password").value;
-    const is_admin = document.getElementById("is-admin").checked ? 1 : 0;
+    const is_admin = document.getElementById("is-admin").value;
 
     if (!name || !email || !password) {
         alert("Please fill out all required fields.");
