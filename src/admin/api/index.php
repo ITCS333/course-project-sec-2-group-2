@@ -51,6 +51,14 @@ $method = $_SERVER['REQUEST_METHOD'];
 $raw = file_get_contents("php://input");
 $data = json_decode($raw, true);
 
+if (!$data || !is_array($data)) {
+    $data = $_POST;
+}
+
+if (!is_array($data)) {
+    $data = [];
+}
+
 
 $id = $_GET['id'] ?? null;
 $action = $_GET['action'] ?? null;
@@ -78,10 +86,10 @@ function getUsers($db) {
     $query = "SELECT id, name, email, is_admin, created_at FROM users";
     $params = [];
 
-    if ($search) {
-        $query .= " WHERE name LIKE :search OR email LIKE :search";
-        $params[':search'] = "%$search%";
-    }
+    if ($search !== null && $search !== '') {
+    $query .= " WHERE name LIKE :search OR email LIKE :search";
+    $params[':search'] = "%$search%";
+}
 
     $allowedSort = ['name','email','is_admin'];
     if ($sort && in_array($sort, $allowedSort)) {
@@ -121,6 +129,7 @@ function getUserById($db, $id) {
  *   - is_admin (int, optional)    - 0 (student) or 1 (admin); defaults to 0
  */
 function createUser($db, $data) {
+    
     if (empty($data['name']) || empty($data['email']) || empty($data['password'])) {
         sendResponse("Missing required fields", 400);
     }
@@ -128,8 +137,10 @@ function createUser($db, $data) {
     $name = sanitizeInput($data['name']);
     $email = sanitizeInput($data['email']);
     $password = trim($data['password']);
-    $is_admin = isset($data['is_admin']) && $data['is_admin'] == 1 ? 1 : 0;
-
+    $is_admin = 0;
+    if (isset($data['is_admin'])) {
+        $is_admin = ($data['is_admin'] == 1) ? 1 : 0;
+        
     if (!validateEmail($email)) sendResponse("Invalid email", 400);
     if (strlen($password) < 8) sendResponse("Password too short", 400);
 
