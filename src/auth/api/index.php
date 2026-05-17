@@ -10,6 +10,10 @@
 // --- Session Management ---
 session_start();
 
+
+require_once 'db.php';
+
+
 // --- Set Response Headers ---
 header('Content-Type: application/json');
 
