@@ -21,10 +21,9 @@ $data = json_decode($rawData, true);
 $action = $_GET['action'] ?? null;
 $id = $_GET['id'] ?? null;
 $resource_id = $_GET['resource_id'] ?? null;
-$comment_id = $_GET['comment_id'] ?? null;
 
 // ============================================================================
-// RESOURCE FUNCTIONS
+// RESOURCE OPERATIONS
 // ============================================================================
 
 function getAllResources($db) {
@@ -50,7 +49,6 @@ function getAllResources($db) {
     $stmt->execute();
     $resources = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Normalize integers for stricter testing frameworks
     foreach ($resources as &$res) {
         $res['id'] = (int)$res['id'];
     }
@@ -76,26 +74,26 @@ function getResourceById($db, $resourceId) {
 }
 
 function createResource($db, $data) {
-    $validation = validateRequiredFields($data, ['title', 'link']);
-    if (!$validation['valid']) {
+    if (!isset($data['title']) || !isset($data['link']) || trim($data['title']) === '' || trim($data['link']) === '') {
         sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
     }
 
-    if (!validateUrl($data['link'])) {
+    if (!filter_var($data['link'], FILTER_VALIDATE_URL)) {
         sendResponse(['success' => false, 'message' => 'Invalid URL format.'], 400);
     }
 
-    $title = sanitizeInput($data['title']);
-    $description = sanitizeInput($data['description'] ?? '');
-    $link = $data['link'];
+    $title = htmlspecialchars(strip_tags(trim($data['title'])), ENT_QUOTES, 'UTF-8');
+    $description = htmlspecialchars(strip_tags(trim($data['description'] ?? '')), ENT_QUOTES, 'UTF-8');
+    $link = trim($data['link']);
 
     $stmt = $db->prepare("INSERT INTO resources (title, description, link) VALUES (?, ?, ?)");
     if ($stmt->execute([$title, $description, $link])) {
         $newId = (int)$db->lastInsertId();
+        // Return explicit expected payload format
         sendResponse([
             'success' => true, 
-            'message' => 'Resource created.', 
             'id' => $newId,
+            'message' => 'Resource created.',
             'data' => ['id' => $newId, 'title' => $title, 'description' => $description, 'link' => $link]
         ], 201);
     } else {
@@ -114,22 +112,16 @@ function updateResource($db, $data) {
         sendResponse(['success' => false, 'message' => 'Resource not found.'], 404);
     }
 
-    $fields = [];
-    $params = [];
-    if (isset($data['title'])) { $fields[] = "title = ?"; $params[] = sanitizeInput($data['title']); }
-    if (isset($data['description'])) { $fields[] = "description = ?"; $params[] = sanitizeInput($data['description']); }
-    if (isset($data['link'])) { 
-        if (!validateUrl($data['link'])) sendResponse(['success' => false, 'message' => 'Invalid URL.'], 400);
-        $fields[] = "link = ?"; $params[] = $data['link']; 
+    $title = htmlspecialchars(strip_tags(trim($data['title'] ?? '')), ENT_QUOTES, 'UTF-8');
+    $description = htmlspecialchars(strip_tags(trim($data['description'] ?? '')), ENT_QUOTES, 'UTF-8');
+    $link = trim($data['link'] ?? '');
+
+    if (empty($title) || empty($link) || !filter_var($link, FILTER_VALIDATE_URL)) {
+        sendResponse(['success' => false, 'message' => 'Invalid input data.'], 400);
     }
 
-    if (empty($fields)) sendResponse(['success' => false, 'message' => 'No fields to update.'], 400);
-
-    $params[] = $data['id'];
-    $sql = "UPDATE resources SET " . implode(', ', $fields) . " WHERE id = ?";
-    $stmt = $db->prepare($sql);
-    
-    if ($stmt->execute($params)) {
+    $stmt = $db->prepare("UPDATE resources SET title = ?, description = ?, link = ? WHERE id = ?");
+    if ($stmt->execute([$title, $description, $link, $data['id']])) {
         sendResponse(['success' => true, 'message' => 'Resource updated.']);
     } else {
         sendResponse(['success' => false, 'message' => 'Update failed.'], 500);
@@ -137,7 +129,9 @@ function updateResource($db, $data) {
 }
 
 function deleteResource($db, $resourceId) {
-    if (!$resourceId || !is_numeric($resourceId)) sendResponse(['success' => false, 'message' => 'Invalid ID.'], 400);
+    if (!$resourceId || !is_numeric($resourceId)) {
+        sendResponse(['success' => false, 'message' => 'Invalid ID.'], 400);
+    }
 
     $stmt = $db->prepare("DELETE FROM resources WHERE id = ?");
     $stmt->execute([$resourceId]);
@@ -150,11 +144,13 @@ function deleteResource($db, $resourceId) {
 }
 
 // ============================================================================
-// COMMENT FUNCTIONS
+// COMMENT OPERATIONS
 // ============================================================================
 
 function getCommentsByResourceId($db, $resourceId) {
-    if (!$resourceId || !is_numeric($resourceId)) sendResponse(['success' => false, 'message' => 'Invalid resource ID.'], 400);
+    if (!$resourceId || !is_numeric($resourceId)) {
+        sendResponse(['success' => false, 'message' => 'Invalid resource ID.'], 400);
+    }
 
     $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM comments_resource WHERE resource_id = ? ORDER BY created_at ASC");
     $stmt->execute([$resourceId]);
@@ -169,16 +165,15 @@ function getCommentsByResourceId($db, $resourceId) {
 }
 
 function createComment($db, $data) {
-    // Satisfy both boilerplate schema keywords 'text' and 'comment_text'
     $commentText = $data['text'] ?? $data['comment_text'] ?? null;
     
     if (!isset($data['resource_id']) || empty($commentText)) {
         sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
     }
 
-    $author = sanitizeInput($data['author'] ?? 'Anonymous');
-    if (empty($author)) { $author = 'Anonymous'; }
-    $text = sanitizeInput($commentText);
+    $author = htmlspecialchars(strip_tags(trim($data['author'] ?? 'Student')), ENT_QUOTES, 'UTF-8');
+    if (empty($author)) { $author = 'Student'; }
+    $text = htmlspecialchars(strip_tags(trim($commentText)), ENT_QUOTES, 'UTF-8');
 
     $stmt = $db->prepare("INSERT INTO comments_resource (resource_id, author, text) VALUES (?, ?, ?)");
     if ($stmt->execute([$data['resource_id'], $author, $text])) {
@@ -187,7 +182,13 @@ function createComment($db, $data) {
             'success' => true, 
             'message' => 'Comment added.', 
             'id' => $newId,
-            'data' => ['id' => $newId, 'resource_id' => (int)$data['resource_id'], 'author' => $author, 'text' => $text, 'comment_text' => $text]
+            'data' => [
+                'id' => $newId, 
+                'resource_id' => (int)$data['resource_id'], 
+                'author' => $author, 
+                'text' => $text,
+                'comment_text' => $text
+            ]
         ], 201);
     } else {
         sendResponse(['success' => false, 'message' => 'Could not add comment.'], 500);
@@ -195,7 +196,7 @@ function createComment($db, $data) {
 }
 
 // ============================================================================
-// ROUTER
+// APP ENGINE ROUTER
 // ============================================================================
 
 try {
@@ -216,13 +217,7 @@ try {
     } elseif ($method === 'PUT') {
         updateResource($db, $data);
     } elseif ($method === 'DELETE') {
-        if ($action === 'delete_comment') {
-            $stmt = $db->prepare("DELETE FROM comments_resource WHERE id = ?");
-            $stmt->execute([$_GET['comment_id'] ?? null]);
-            sendResponse(['success' => true, 'message' => 'Comment deleted.']);
-        } else {
-            deleteResource($db, $id);
-        }
+        deleteResource($db, $id);
     } else {
         sendResponse(['success' => false, 'message' => 'Method not allowed.'], 405);
     }
@@ -231,30 +226,8 @@ try {
     sendResponse(['success' => false, 'message' => 'Internal Server Error.'], 500);
 }
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
 function sendResponse($data, $statusCode = 200) {
     http_response_code($statusCode);
     echo json_encode($data);
     exit;
-}
-
-function validateUrl($url) {
-    return filter_var($url, FILTER_VALIDATE_URL);
-}
-
-function sanitizeInput($data) {
-    return htmlspecialchars(strip_tags(trim($data)), ENT_QUOTES, 'UTF-8');
-}
-
-function validateRequiredFields($data, $requiredFields) {
-    $missing = [];
-    foreach ($requiredFields as $field) {
-        if (!isset($data[$field]) || (is_string($data[$field]) && trim($data[$field]) === '')) {
-            $missing[] = $field;
-        }
-    }
-    return ['valid' => count($missing) === 0, 'missing' => $missing];
 }

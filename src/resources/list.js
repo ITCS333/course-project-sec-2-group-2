@@ -1,25 +1,37 @@
+/*
+  Requirement: Populate the "Course Resources" list page.
+*/
+
+// --- Element Selections ---
 const resourceListSection = document.querySelector('#resource-list-section');
 
+// --- Functions ---
+
+/**
+ * Creates an article element for a resource.
+ */
 function createResourceArticle(resource) {
-  const col = document.createElement('div');
-  col.className = "col-md-6 col-lg-4 mb-4";
-  col.innerHTML = `
-    <article class="card h-100 shadow-sm">
-      <div class="card-body">
-        <h2 class="card-title h5">${resource.title}</h2>
-        <p class="card-text text-muted">${resource.description || ''}</p>
-        <a href="details.html?id=${resource.id}" class="btn btn-outline-primary">View Resource & Discussion</a>
-      </div>
-    </article>
+  const article = document.createElement('article');
+  article.className = "card h-100 shadow-sm mb-4";
+  
+  article.innerHTML = `
+    <div class="card-body">
+      <h2 class="card-title h5">${resource.title}</h2>
+      <p class="card-text text-muted">${resource.description || ''}</p>
+      <a href="details.html?id=${resource.id}" class="btn btn-outline-primary">View Resource & Discussion</a>
+    </div>
   `;
-  return col;
+  return article;
 }
 
+/**
+ * Fetches resources from the API and populates the list.
+ */
 async function loadResources() {
   try {
     const response = await fetch('./api/index.php');
     const result = await response.json();
-    if (result.success) {
+    if (result.success && resourceListSection) {
       resourceListSection.innerHTML = '';
       result.data.forEach(resource => {
         resourceListSection.appendChild(createResourceArticle(resource));
@@ -30,4 +42,5 @@ async function loadResources() {
   }
 }
 
+// --- Initial Page Load ---
 document.addEventListener('DOMContentLoaded', loadResources);
