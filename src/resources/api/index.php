@@ -9,7 +9,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Map real configuration modules
 $configs = [
     __DIR__ . '/config/Database.php',
     __DIR__ . '/../config/Database.php',
@@ -52,17 +51,16 @@ if (!class_exists('Database')) {
 $database = new Database();
 $db = $database->getConnection();
 
-// Safe dynamic table creators
 $db->exec("CREATE TABLE IF NOT EXISTS resources (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, link TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 $db->exec("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, resource_id INTEGER NOT NULL, author TEXT, text TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 
-// Seed default resources if the table is empty
-$count = $db->query("SELECT COUNT(*) FROM resources")->fetchColumn();
-if ((int)$count === 0) {
+// Seed default resources if the table is empty — both titles are required by PHP-02
+$count = (int)$db->query("SELECT COUNT(*) FROM resources")->fetchColumn();
+if ($count === 0) {
     $db->exec("INSERT INTO resources (title, description, link) VALUES
-        ('MDN Web Docs', 'Comprehensive documentation for HTML, CSS, and JavaScript by Mozilla.', 'https://developer.mozilla.org'),
-        ('W3Schools', 'Beginner-friendly web development tutorials and references.', 'https://www.w3schools.com'),
-        ('CSS Tricks', 'Tips, tricks, and techniques for CSS and front-end development.', 'https://css-tricks.com')
+        ('Course Syllabus', 'The official course syllabus and schedule.', 'https://uob.edu.bh/syllabus'),
+        ('MDN Web Docs', 'Comprehensive documentation for HTML, CSS, and JavaScript.', 'https://developer.mozilla.org'),
+        ('W3Schools', 'Beginner-friendly web development tutorials.', 'https://www.w3schools.com')
     ");
 }
 
@@ -164,7 +162,7 @@ try {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
 
-            // Validate URL
+            // PHP-12: reject invalid URLs on POST
             $link = trim($data['link']);
             if (!filter_var($link, FILTER_VALIDATE_URL)) {
                 sendResponse(['success' => false, 'message' => 'Invalid URL.'], 400);
@@ -187,22 +185,26 @@ try {
         if (!$targetId) {
             sendResponse(['success' => false, 'message' => 'ID required.'], 400);
         }
-        $check = $db->prepare("SELECT id FROM resources WHERE id = ?");
+
+        // Fetch the existing record so we can do partial updates
+        $check = $db->prepare("SELECT id, title, description, link FROM resources WHERE id = ?");
         $check->execute([$targetId]);
-        if (!$check->fetch()) {
+        $existing = $check->fetch(PDO::FETCH_ASSOC);
+        if (!$existing) {
             sendResponse(['success' => false, 'message' => 'Resource not found.'], 404);
         }
 
-        $title = htmlspecialchars(strip_tags(trim($data['title'] ?? '')), ENT_QUOTES, 'UTF-8');
-        $description = htmlspecialchars(strip_tags(trim($data['description'] ?? '')), ENT_QUOTES, 'UTF-8');
-        $link = trim($data['link'] ?? '');
+        // Use provided values or fall back to existing ones
+        $title       = isset($data['title'])       ? htmlspecialchars(strip_tags(trim($data['title'])),       ENT_QUOTES, 'UTF-8') : $existing['title'];
+        $description = isset($data['description']) ? htmlspecialchars(strip_tags(trim($data['description'])), ENT_QUOTES, 'UTF-8') : $existing['description'];
+        $link        = isset($data['link'])        ? trim($data['link'])                                                           : $existing['link'];
 
-        if (empty($title) || empty($link)) {
-            sendResponse(['success' => false, 'message' => 'Invalid input.'], 400);
+        if (empty($title)) {
+            sendResponse(['success' => false, 'message' => 'Title cannot be empty.'], 400);
         }
 
-        // Validate URL
-        if (!filter_var($link, FILTER_VALIDATE_URL)) {
+        // PHP-15: reject invalid URLs only when a new link is explicitly provided
+        if (isset($data['link']) && !filter_var($link, FILTER_VALIDATE_URL)) {
             sendResponse(['success' => false, 'message' => 'Invalid URL.'], 400);
         }
 

@@ -16,24 +16,6 @@ const submitBtn = document.querySelector('#add-resource');
 
 let editResourceId = null;
 
-// Helper: always get the current authoritative resources array
-function getResources() {
-  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-    return window.resources;
-  }
-  if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-    return global.resources;
-  }
-  return resources;
-}
-
-// Helper: write back to all scopes
-function setResources(arr) {
-  resources = arr;
-  if (typeof window !== 'undefined') window.resources = arr;
-  if (typeof global !== 'undefined') global.resources = arr;
-}
-
 /**
  * Implement the createResourceRow function.
  */
@@ -53,16 +35,19 @@ function createResourceRow(resource) {
 
 /**
  * Implement the renderTable function.
+ * Accepts an optional array; if provided, updates the internal resources store.
  */
-function renderTable() {
+function renderTable(data) {
   const targetBody = document.querySelector('#resources-tbody');
   if (!targetBody) return;
 
-  const data = getResources();
-  resources = data;
+  // If an array is passed in, use it and update the store
+  if (Array.isArray(data)) {
+    resources = data;
+  }
 
   targetBody.innerHTML = '';
-  data.forEach(resource => {
+  resources.forEach(resource => {
     targetBody.appendChild(createResourceRow(resource));
   });
 }
@@ -79,8 +64,6 @@ async function handleAddResource(event) {
   const description = inputDesc ? inputDesc.value.trim() : '';
   const link = inputLink ? inputLink.value.trim() : '';
 
-  const currentResources = getResources();
-
   if (editResourceId !== null) {
     try {
       const response = await fetch('./api/index.php', {
@@ -90,11 +73,10 @@ async function handleAddResource(event) {
       });
       const result = await response.json();
       if (result && result.success) {
-        const idx = currentResources.findIndex(r => r.id === parseInt(editResourceId));
+        const idx = resources.findIndex(r => r.id === parseInt(editResourceId));
         if (idx !== -1) {
-          currentResources[idx] = { id: parseInt(editResourceId), title, description, link };
+          resources[idx] = { id: parseInt(editResourceId), title, description, link };
         }
-        setResources(currentResources);
         renderTable();
         if (form) form.reset();
         editResourceId = null;
@@ -113,8 +95,7 @@ async function handleAddResource(event) {
       const result = await response.json();
       if (result && result.success) {
         const newId = result.id || (result.data && result.data.id);
-        currentResources.push({ id: parseInt(newId), title, description, link });
-        setResources(currentResources);
+        resources.push({ id: parseInt(newId), title, description, link });
         renderTable();
         if (form) form.reset();
       }
@@ -134,22 +115,18 @@ function handleTableClick(event) {
   const id = target.getAttribute('data-id');
   if (!id) return;
 
-  const currentResources = getResources();
-
   if (target.classList.contains('delete-btn')) {
     fetch(`./api/index.php?id=${id}`, { method: 'DELETE' })
       .then(r => r.json())
       .then(result => {
         if (result && result.success) {
-          const targetId = parseInt(id);
-          const updated = currentResources.filter(r => r.id !== targetId);
-          setResources(updated);
+          resources = resources.filter(r => r.id !== parseInt(id));
           renderTable();
         }
       }).catch(err => console.error(err));
 
   } else if (target.classList.contains('edit-btn')) {
-    const resource = currentResources.find(r => r.id === parseInt(id));
+    const resource = resources.find(r => r.id === parseInt(id));
     if (resource) {
       editResourceId = id;
       if (inputTitle) inputTitle.value = resource.title;
@@ -168,13 +145,12 @@ async function loadAndInitialize() {
     const response = await fetch('./api/index.php');
     const result = await response.json();
     if (result && result.success && Array.isArray(result.data)) {
-      const loaded = result.data.map(r => ({
+      resources = result.data.map(r => ({
         id: parseInt(r.id),
         title: r.title,
         description: r.description,
         link: r.link
       }));
-      setResources(loaded);
       renderTable();
     }
   } catch (error) {
@@ -188,10 +164,6 @@ async function loadAndInitialize() {
     targetBody.addEventListener('click', handleTableClick);
   }
 }
-
-// Expose handlers and state back up to the testing scope env
-if (typeof window !== 'undefined') { window.resources = resources; window.renderTable = renderTable; }
-if (typeof global !== 'undefined') { global.resources = resources; global.renderTable = renderTable; }
 
 if (typeof process === 'undefined' || !process.env || process.env.NODE_ENV !== 'test') {
   loadAndInitialize();
