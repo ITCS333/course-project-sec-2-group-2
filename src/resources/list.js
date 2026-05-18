@@ -3,29 +3,27 @@
 */
 
 // --- Element Selections ---
+// Select the section for the resource list ('#resource-list-section').
 const resourceListSection = document.querySelector('#resource-list-section');
 
 // --- Functions ---
 
 /**
- * Creates an article element for a resource.
+ * Implement the createResourceArticle function.
  */
 function createResourceArticle(resource) {
   const article = document.createElement('article');
-  article.className = "card h-100 shadow-sm mb-4";
   
   article.innerHTML = `
-    <div class="card-body">
-      <h2 class="card-title h5">${resource.title}</h2>
-      <p class="card-text text-muted">${resource.description || ''}</p>
-      <a href="details.html?id=${resource.id}" class="btn btn-outline-primary">View Resource & Discussion</a>
-    </div>
+    <h2>${resource.title}</h2>
+    <p>${resource.description || ''}</p>
+    <a href="details.html?id=${resource.id}">View Resource & Discussion</a>
   `;
   return article;
 }
 
 /**
- * Fetches resources from the API and populates the list.
+ * Implement the loadResources function.
  */
 async function loadResources() {
   try {
@@ -43,4 +41,5 @@ async function loadResources() {
 }
 
 // --- Initial Page Load ---
-document.addEventListener('DOMContentLoaded', loadResources);
+// Call the function to populate the page immediately (without wrapping inside event listeners)
+loadResources();

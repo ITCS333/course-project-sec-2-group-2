@@ -4,8 +4,6 @@
 
 // --- Global Data Store ---
 let resources = [];
-let isEditMode = false;
-let editResourceId = null;
 
 // --- Element Selections ---
 const form = document.querySelector('#resource-form');
@@ -19,24 +17,45 @@ const inputLink = document.querySelector('#resource-link');
 // --- Functions ---
 
 /**
- * Generates a resource row element.
+ * Implement the createResourceRow function.
  */
 function createResourceRow(resource) {
   const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>${resource.title}</td>
-    <td>${resource.description || ''}</td>
-    <td><a href="${resource.link}" target="_blank">${resource.link}</a></td>
-    <td>
-      <button class="btn btn-sm btn-info edit-btn" data-id="${resource.id}">Edit</button>
-      <button class="btn btn-sm btn-danger delete-btn" data-id="${resource.id}">Delete</button>
-    </td>
-  `;
+  
+  const tdTitle = document.createElement('td');
+  tdTitle.textContent = resource.title;
+  
+  const tdDesc = document.createElement('td');
+  tdDesc.textContent = resource.description || '';
+  
+  const tdLink = document.createElement('td');
+  tdLink.textContent = resource.link;
+  
+  const tdActions = document.createElement('td');
+  
+  const editBtn = document.createElement('button');
+  editBtn.className = "edit-btn";
+  editBtn.setAttribute('data-id', resource.id);
+  editBtn.textContent = "Edit";
+  
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = "delete-btn";
+  deleteBtn.setAttribute('data-id', resource.id);
+  deleteBtn.textContent = "Delete";
+  
+  tdActions.appendChild(editBtn);
+  tdActions.appendChild(deleteBtn);
+  
+  tr.appendChild(tdTitle);
+  tr.appendChild(tdDesc);
+  tr.appendChild(tdLink);
+  tr.appendChild(tdActions);
+  
   return tr;
 }
 
 /**
- * Renders the collection array to table layout.
+ * Implement the renderTable function.
  */
 function renderTable() {
   if (!tbody) return;
@@ -47,7 +66,7 @@ function renderTable() {
 }
 
 /**
- * Handles adding or updating a resource.
+ * Implement the handleAddResource function.
  */
 async function handleAddResource(event) {
   event.preventDefault();
@@ -56,86 +75,91 @@ async function handleAddResource(event) {
   const description = inputDesc.value.trim();
   const link = inputLink.value.trim();
 
-  if (isEditMode) {
-    // Mode: Update Resource (PUT)
-    try {
-      const response = await fetch('./api/index.php', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: parseInt(editResourceId), title, description, link })
-      });
-      const result = await response.json();
-      if (result.success) {
-        const index = resources.findIndex(r => r.id === parseInt(editResourceId));
-        if (index !== -1) {
-          resources[index] = { id: parseInt(editResourceId), title, description, link };
-        }
-        renderTable();
-        form.reset();
-        isEditMode = false;
-        editResourceId = null;
-        if (submitBtn) submitBtn.textContent = "Add Resource";
-      }
-    } catch (error) {
-      console.error(error);
+  try {
+    const response = await fetch('./api/index.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, link })
+    });
+    const result = await response.json();
+    if (result.success) {
+      const newId = result.id;
+      resources.push({ id: parseInt(newId), title, description, link });
+      renderTable();
+      form.reset();
     }
-  } else {
-    // Mode: Add Resource (POST)
-    try {
-      const response = await fetch('./api/index.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, link })
-      });
-      const result = await response.json();
-      if (result.success) {
-        const newId = result.id;
-        resources.push({ id: parseInt(newId), title, description, link });
-        renderTable();
-        form.reset();
-      }
-    } catch (error) {
-      console.error(error);
-    }
+  } catch (error) {
+    console.error(error);
   }
 }
 
 /**
- * Handles table delegation click paths (Edit/Delete).
+ * Implement the handleTableClick function.
  */
 function handleTableClick(event) {
   const target = event.target;
-  const id = target.dataset.id;
+  const id = target.getAttribute('data-id');
   if (!id) return;
 
   if (target.classList.contains('delete-btn')) {
-    if (confirm('Are you sure you want to delete this resource?')) {
-      fetch(`./api/index.php?id=${id}`, { method: 'DELETE' })
-        .then(r => r.json())
-        .then(result => {
-          if (result.success) {
-            resources = resources.filter(r => r.id !== parseInt(id));
-            renderTable();
-          }
-        }).catch(err => console.error(err));
-    }
+    fetch(`./api/index.php?id=${id}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(result => {
+        if (result.success) {
+          resources = resources.filter(r => r.id !== parseInt(id));
+          renderTable();
+        }
+      }).catch(err => console.error(err));
+      
   } else if (target.classList.contains('edit-btn')) {
     const resource = resources.find(r => r.id === parseInt(id));
     if (resource) {
-      isEditMode = true;
-      editResourceId = id;
-      
       if (inputTitle) inputTitle.value = resource.title;
       if (inputDesc) inputDesc.value = resource.description || '';
       if (inputLink) inputLink.value = resource.link;
       
       if (submitBtn) submitBtn.textContent = "Update Resource";
+      
+      // Override form listener dynamically to handle PUT submission for this edit lifecycle
+      const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        const updatedTitle = inputTitle.value.trim();
+        const updatedDesc = inputDesc.value.trim();
+        const updatedLink = inputLink.value.trim();
+
+        try {
+          const response = await fetch('./api/index.php', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: parseInt(id), title: updatedTitle, description: updatedDesc, link: updatedLink })
+          });
+          const result = await response.json();
+          if (result.success) {
+            const idx = resources.findIndex(r => r.id === parseInt(id));
+            if (idx !== -1) {
+              resources[idx] = { id: parseInt(id), title: updatedTitle, description: updatedDesc, link: updatedLink };
+            }
+            renderTable();
+            form.reset();
+            if (submitBtn) submitBtn.textContent = "Add Resource";
+            
+            // Re-bind to fresh standard insert listener
+            form.removeEventListener('submit', handleEditSubmit);
+            form.addEventListener('submit', handleAddResource);
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      };
+      
+      form.removeEventListener('submit', handleAddResource);
+      form.addEventListener('submit', handleEditSubmit);
     }
   }
 }
 
 /**
- * Mounts operational workflows on startup.
+ * Implement the loadAndInitialize function.
  */
 async function loadAndInitialize() {
   try {
@@ -159,4 +183,4 @@ async function loadAndInitialize() {
 }
 
 // --- Initial Page Load ---
-document.addEventListener('DOMContentLoaded', loadAndInitialize);
+loadAndInitialize();

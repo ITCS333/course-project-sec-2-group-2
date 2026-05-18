@@ -17,7 +17,7 @@ const commentInput = document.querySelector('#new-comment');
 // --- Functions ---
 
 /**
- * Gets the resource ID from the URL query string.
+ * Implement the getResourceIdFromURL function.
  */
 function getResourceIdFromURL() {
   const params = new URLSearchParams(window.location.search);
@@ -25,7 +25,7 @@ function getResourceIdFromURL() {
 }
 
 /**
- * Renders the primary resource data.
+ * Implement the renderResourceDetails function.
  */
 function renderResourceDetails(resource) {
   if (titleEl) titleEl.textContent = resource.title;
@@ -34,24 +34,24 @@ function renderResourceDetails(resource) {
 }
 
 /**
- * Creates a single comment article element.
+ * Implement the createCommentArticle function.
  */
 function createCommentArticle(comment) {
   const article = document.createElement('article');
-  article.className = "border-start border-4 border-primary p-3 mb-2 bg-white shadow-sm";
   
-  const text = comment.text || comment.comment_text || '';
-  const author = comment.author || 'Student';
+  const p = document.createElement('p');
+  p.textContent = comment.text || comment.comment_text || '';
   
-  article.innerHTML = `
-    <p class="mb-1">${text}</p>
-    <footer class="text-muted small">Posted by: ${author}</footer>
-  `;
+  const footer = document.createElement('footer');
+  footer.textContent = `Posted by: ${comment.author || 'Student'}`;
+  
+  article.appendChild(p);
+  article.appendChild(footer);
   return article;
 }
 
 /**
- * Clears and redraws the comment wall.
+ * Implement the renderComments function.
  */
 function renderComments() {
   if (!commentListEl) return;
@@ -62,7 +62,7 @@ function renderComments() {
 }
 
 /**
- * Handles posting a new comment.
+ * Implement the handleAddComment function.
  */
 async function handleAddComment(event) {
   event.preventDefault();
@@ -74,22 +74,21 @@ async function handleAddComment(event) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        resource_id: parseInt(currentResourceId),
+        resource_id: currentResourceId,
         author: 'Student',
         text: commentText
       })
     });
     const result = await res.json();
     if (result.success) {
-      // Push response data or construct locally fallback
       const newComment = result.data || { 
-        resource_id: parseInt(currentResourceId), 
+        resource_id: currentResourceId, 
         author: 'Student', 
         text: commentText 
       };
       currentComments.push(newComment);
       renderComments();
-      commentForm.reset();
+      commentInput.value = '';
     }
   } catch (error) { 
     console.error(error); 
@@ -97,7 +96,7 @@ async function handleAddComment(event) {
 }
 
 /**
- * Initial page loading workflow.
+ * Implement the initializePage function.
  */
 async function initializePage() {
   currentResourceId = getResourceIdFromURL();
@@ -129,4 +128,4 @@ async function initializePage() {
 }
 
 // --- Initial Page Load ---
-document.addEventListener('DOMContentLoaded', initializePage);
+initializePage();
