@@ -9,7 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-require_once './config/Database.php';
+// Fixed path using absolute tracking template macro to prevent 500 error on tests
+require_once __DIR__ . '/config/Database.php';
 
 $database = new Database();
 $db = $database->getConnection();
@@ -22,7 +23,7 @@ $action = $_GET['action'] ?? null;
 $id = $_GET['id'] ?? null;
 $resource_id = $_GET['resource_id'] ?? null;
 
-// Determine table name dynamically safely
+// Determine comment table layout dynamically based on DB environment context
 $commentsTable = "comments";
 try {
     $db->query("SELECT 1 FROM comments LIMIT 1");
@@ -88,7 +89,6 @@ try {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
             
-            // Explicitly assert parent resource presence
             $checkRes = $db->prepare("SELECT id FROM resources WHERE id = ?");
             $checkRes->execute([$data['resource_id']]);
             if (!$checkRes->fetch()) {

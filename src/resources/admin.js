@@ -4,11 +4,10 @@
 
 // --- Global Data Store ---
 let resources = [];
-let editResourceId = null; // Keeps track of active resource ID being edited
+let editResourceId = null;
 
 // --- Element Selections ---
 const form = document.querySelector('#resource-form');
-const tbody = document.querySelector('#resources-tbody');
 const submitBtn = document.querySelector('#add-resource');
 
 const inputTitle = document.querySelector('#resource-title');
@@ -40,10 +39,12 @@ function createResourceRow(resource) {
  * Implement the renderTable function.
  */
 function renderTable() {
-  if (!tbody) return;
-  tbody.innerHTML = '';
+  const targetTbody = document.querySelector('#resources-tbody');
+  if (!targetTbody) return;
+  
+  targetTbody.innerHTML = '';
   resources.forEach(resource => {
-    tbody.appendChild(createResourceRow(resource));
+    targetTbody.appendChild(createResourceRow(resource));
   });
 }
 
@@ -58,7 +59,6 @@ async function handleAddResource(event) {
   const link = inputLink.value.trim();
 
   if (editResourceId !== null) {
-    // Mode: PUT Update
     try {
       const response = await fetch('./api/index.php', {
         method: 'PUT',
@@ -72,7 +72,7 @@ async function handleAddResource(event) {
           resources[idx] = { id: parseInt(editResourceId), title, description, link };
         }
         renderTable();
-        form.reset();
+        if (form) form.reset();
         editResourceId = null;
         if (submitBtn) submitBtn.textContent = "Add Resource";
       }
@@ -80,7 +80,6 @@ async function handleAddResource(event) {
       console.error(error);
     }
   } else {
-    // Mode: POST Insert
     try {
       const response = await fetch('./api/index.php', {
         method: 'POST',
@@ -92,7 +91,7 @@ async function handleAddResource(event) {
         const newId = result.id;
         resources.push({ id: parseInt(newId), title, description, link });
         renderTable();
-        form.reset();
+        if (form) form.reset();
       }
     } catch (error) {
       console.error(error);
@@ -152,7 +151,8 @@ async function loadAndInitialize() {
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
-  if (tbody) tbody.addEventListener('click', handleTableClick);
+  const targetTbody = document.querySelector('#resources-tbody');
+  if (targetTbody) targetTbody.addEventListener('click', handleTableClick);
 }
 
 // --- Initial Page Load ---
