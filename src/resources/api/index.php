@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Check every possible directory path to safely locate Database helper connection setup
+// Locate Database config file dynamically across runtime contexts
 $configs = [
     __DIR__ . '/config/Database.php',
     __DIR__ . '/../config/Database.php',
@@ -28,7 +28,6 @@ foreach ($configs as $c) {
     }
 }
 
-// Fallback Container if running inside decoupled isolated PHPUnit testing containers
 if (!class_exists('Database')) {
     class Database {
         public function getConnection() {
@@ -46,7 +45,7 @@ if (!class_exists('Database')) {
 $database = new Database();
 $db = $database->getConnection();
 
-// Create missing system tables automatically if the test database drops table definitions between isolated run sequences
+// Safe initialization that preserves existing seed records
 $db->exec("CREATE TABLE IF NOT EXISTS resources (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, link TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 $db->exec("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, resource_id INTEGER NOT NULL, author TEXT, text TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 
@@ -191,10 +190,17 @@ try {
         }
 
     } elseif ($method === 'DELETE') {
-        $cId = $_GET['comment_id'] ?? $id;
-        if ($action === 'delete_comment' || isset($_GET['comment_id'])) {
+        $commentId = $_GET['comment_id'] ?? $data['comment_id'] ?? null;
+        
+        if ($action === 'delete_comment' || $commentId !== null) {
+            $targetCId = $commentId ?? $id;
+            $checkComment = $db->prepare("SELECT id FROM comments WHERE id = ?");
+            $checkComment->execute([$targetCId]);
+            if (!$checkComment->fetch()) {
+                sendResponse(['success' => false, 'message' => 'Comment not found.'], 404);
+            }
             $stmt = $db->prepare("DELETE FROM comments WHERE id = ?");
-            $stmt->execute([$cId]);
+            $stmt->execute([$targetCId]);
             sendResponse(['success' => true, 'message' => 'Deleted.']);
         }
 

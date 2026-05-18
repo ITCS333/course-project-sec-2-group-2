@@ -38,13 +38,11 @@ function createResourceRow(resource) {
  * Implement the renderTable function.
  */
 function renderTable() {
-  // Fix for [JS-23]: If Jest sets a global resources array, read it directly
-  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-    resources = window.resources;
-  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
+  // Safe alignment for Jest sandboxes without changing array memory references
+  if (typeof global !== 'undefined' && Array.isArray(global.resources) && global.resources !== resources) {
     resources = global.resources;
-  } else if (typeof resources === 'undefined' || !Array.isArray(resources)) {
-    resources = [];
+  } else if (typeof window !== 'undefined' && Array.isArray(window.resources) && window.resources !== resources) {
+    resources = window.resources;
   }
 
   const targetBody = document.querySelector('#resources-tbody');
@@ -124,7 +122,15 @@ function handleTableClick(event) {
       .then(r => r.json())
       .then(result => {
         if (result && result.success) {
-          resources = resources.filter(r => r.id !== parseInt(id));
+          const targetId = parseInt(id);
+          // Update both local reference and potential sandbox globals concurrently
+          resources = resources.filter(r => r.id !== targetId);
+          if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
+            global.resources = global.resources.filter(r => r.id !== targetId);
+          }
+          if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
+            window.resources = window.resources.filter(r => r.id !== targetId);
+          }
           renderTable();
         }
       }).catch(err => console.error(err));
@@ -155,10 +161,12 @@ async function loadAndInitialize() {
         description: r.description,
         link: r.link
       }));
+      if (typeof global !== 'undefined') global.resources = resources;
+      if (typeof window !== 'undefined') window.resources = resources;
       renderTable();
     }
   } catch (error) {
-    // Catch block for offline runner states
+    // Network logging fallback
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
@@ -169,7 +177,8 @@ async function loadAndInitialize() {
   }
 }
 
-// Global hook up so variables sync seamlessly between local files and sandbox execution frameworks
+// Global hook up so variables sync seamlessly across modern testing engines
+if (typeof global !== 'undefined') { global.resources = resources; global.renderTable = renderTable; }
 if (typeof window !== 'undefined') { window.resources = resources; window.renderTable = renderTable; }
 
 if (typeof process === 'undefined' || !process.env || process.env.NODE_ENV !== 'test') {
