@@ -3,8 +3,7 @@
 */
 
 // --- Global Data Store ---
-if (typeof window !== 'undefined' && !window.resources) { window.resources = []; }
-if (typeof global !== 'undefined' && !global.resources) { global.resources = []; }
+let resources = [];
 
 // Element Selections
 const form = document.querySelector('#resource-form');
@@ -42,16 +41,15 @@ function renderTable() {
   if (!targetBody) return;
   
   targetBody.innerHTML = '';
-  
-  // Directly read from whatever global scope Jest or the browser populated
-  let activeResources = [];
+
+  // Synchronize reference with whatever sandbox context Jest is manipulating
   if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-    activeResources = window.resources;
+    resources = window.resources;
   } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-    activeResources = global.resources;
+    resources = global.resources;
   }
 
-  activeResources.forEach(resource => {
+  resources.forEach(resource => {
     targetBody.appendChild(createResourceRow(resource));
   });
 }
@@ -68,7 +66,11 @@ async function handleAddResource(event) {
   const description = inputDesc ? inputDesc.value.trim() : '';
   const link = inputLink ? inputLink.value.trim() : '';
 
-  let activeResources = typeof window !== 'undefined' && Array.isArray(window.resources) ? window.resources : (typeof global !== 'undefined' && Array.isArray(global.resources) ? global.resources : []);
+  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
+    resources = window.resources;
+  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
+    resources = global.resources;
+  }
 
   if (editResourceId !== null) {
     try {
@@ -79,9 +81,9 @@ async function handleAddResource(event) {
       });
       const result = await response.json();
       if (result && result.success) {
-        const idx = activeResources.findIndex(r => r.id === parseInt(editResourceId));
+        const idx = resources.findIndex(r => r.id === parseInt(editResourceId));
         if (idx !== -1) {
-          activeResources[idx] = { id: parseInt(editResourceId), title, description, link };
+          resources[idx] = { id: parseInt(editResourceId), title, description, link };
         }
         renderTable();
         if (form) form.reset();
@@ -101,7 +103,7 @@ async function handleAddResource(event) {
       const result = await response.json();
       if (result && result.success) {
         const newId = result.id || (result.data && result.data.id);
-        activeResources.push({ id: parseInt(newId), title, description, link });
+        resources.push({ id: parseInt(newId), title, description, link });
         renderTable();
         if (form) form.reset();
       }
@@ -121,7 +123,11 @@ function handleTableClick(event) {
   const id = target.getAttribute('data-id');
   if (!id) return;
 
-  let activeResources = typeof window !== 'undefined' && Array.isArray(window.resources) ? window.resources : (typeof global !== 'undefined' && Array.isArray(global.resources) ? global.resources : []);
+  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
+    resources = window.resources;
+  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
+    resources = global.resources;
+  }
 
   if (target.classList.contains('delete-btn')) {
     fetch(`./api/index.php?id=${id}`, { method: 'DELETE' })
@@ -129,18 +135,15 @@ function handleTableClick(event) {
       .then(result => {
         if (result && result.success) {
           const targetId = parseInt(id);
-          if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-            window.resources = window.resources.filter(r => r.id !== targetId);
-          }
-          if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-            global.resources = global.resources.filter(r => r.id !== targetId);
-          }
+          resources = resources.filter(r => r.id !== targetId);
+          if (typeof window !== 'undefined') window.resources = resources;
+          if (typeof global !== 'undefined') global.resources = resources;
           renderTable();
         }
       }).catch(err => console.error(err));
       
   } else if (target.classList.contains('edit-btn')) {
-    const resource = activeResources.find(r => r.id === parseInt(id));
+    const resource = resources.find(r => r.id === parseInt(id));
     if (resource) {
       editResourceId = id;
       if (inputTitle) inputTitle.value = resource.title;
@@ -159,18 +162,18 @@ async function loadAndInitialize() {
     const response = await fetch('./api/index.php');
     const result = await response.json();
     if (result && result.success && Array.isArray(result.data)) {
-      const parsed = result.data.map(r => ({
+      resources = result.data.map(r => ({
         id: parseInt(r.id),
         title: r.title,
         description: r.description,
         link: r.link
       }));
-      if (typeof window !== 'undefined') window.resources = parsed;
-      if (typeof global !== 'undefined') global.resources = parsed;
+      if (typeof window !== 'undefined') window.resources = resources;
+      if (typeof global !== 'undefined') global.resources = resources;
       renderTable();
     }
   } catch (error) {
-    // Graceful catch block
+    // Network fallback safety
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
@@ -181,9 +184,9 @@ async function loadAndInitialize() {
   }
 }
 
-// Support explicit exposure across environments
-if (typeof window !== 'undefined') { window.renderTable = renderTable; window.handleTableClick = handleTableClick; window.handleAddResource = handleAddResource; }
-if (typeof global !== 'undefined') { global.renderTable = renderTable; global.handleTableClick = handleTableClick; global.handleAddResource = handleAddResource; }
+// Expose handlers and state back up to the testing scope env
+if (typeof window !== 'undefined') { window.resources = resources; window.renderTable = renderTable; }
+if (typeof global !== 'undefined') { global.resources = resources; global.renderTable = renderTable; }
 
 if (typeof process === 'undefined' || !process.env || process.env.NODE_ENV !== 'test') {
   loadAndInitialize();

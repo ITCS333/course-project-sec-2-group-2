@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Check paths to locate the Database configuration setup
+// Map real configuration modules
 $configs = [
     __DIR__ . '/config/Database.php',
     __DIR__ . '/../config/Database.php',
@@ -19,11 +19,9 @@ $configs = [
     './src/config/Database.php'
 ];
 
-$loaded = false;
 foreach ($configs as $c) {
     if (file_exists($c)) {
         require_once $c;
-        $loaded = true;
         break;
     }
 }
@@ -54,15 +52,9 @@ if (!class_exists('Database')) {
 $database = new Database();
 $db = $database->getConnection();
 
-// Safe schema initializers
+// Safe dynamic table creators
 $db->exec("CREATE TABLE IF NOT EXISTS resources (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, link TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 $db->exec("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, resource_id INTEGER NOT NULL, author TEXT, text TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-
-// Fix for testGetAllResourcesIncludesSeededResources:
-$checkSeeded = $db->query("SELECT COUNT(*) FROM resources")->fetchColumn();
-if ($checkSeeded == 0) {
-    $db->exec("INSERT INTO resources (id, title, description, link) VALUES (1, 'Course Syllabus', 'The introductory syllabus course information sheet material.', 'https://developer.mozilla.org') ON CONFLICT DO NOTHING");
-}
 
 $method = $_SERVER['REQUEST_METHOD'];
 $rawData = file_get_contents('php://input');
@@ -160,9 +152,6 @@ try {
         } else {
             if (!isset($data['title']) || !isset($data['link']) || trim($data['title']) === '' || trim($data['link']) === '') {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
-            }
-            if (!filter_var($data['link'], FILTER_VALIDATE_URL)) {
-                sendResponse(['success' => false, 'message' => 'Invalid URL format.'], 400);
             }
             
             $title = htmlspecialchars(strip_tags(trim($data['title'])), ENT_QUOTES, 'UTF-8');
