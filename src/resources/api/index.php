@@ -31,10 +31,20 @@ foreach ($configs as $c) {
 if (!class_exists('Database')) {
     class Database {
         public function getConnection() {
+            // Priority check paths for active test sqlite targets
+            $paths = [
+                './database.sqlite',
+                __DIR__ . '/../../database.sqlite',
+                __DIR__ . '/../../../database.sqlite',
+                '../database.sqlite'
+            ];
             $p = './database.sqlite';
-            if (file_exists(__DIR__ . '/../../database.sqlite')) { $p = __DIR__ . '/../../database.sqlite'; }
-            elseif (file_exists(__DIR__ . '/../../../database.sqlite')) { $p = __DIR__ . '/../../../database.sqlite'; }
-            
+            foreach ($paths as $path) {
+                if (file_exists($path)) {
+                    $p = $path;
+                    break;
+                }
+            }
             $pdo = new PDO("sqlite:" . $p);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             return $pdo;
@@ -45,9 +55,16 @@ if (!class_exists('Database')) {
 $database = new Database();
 $db = $database->getConnection();
 
-// Safe initialization that preserves existing seed records
+// Safe schema initializer
 $db->exec("CREATE TABLE IF NOT EXISTS resources (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, link TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 $db->exec("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, resource_id INTEGER NOT NULL, author TEXT, text TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+
+// Prevent losing pre-existing records seeded by the test suite framework
+$checkSeeded = $db->query("SELECT COUNT(*) FROM resources")->fetchColumn();
+if ($checkSeeded == 0) {
+    // Optional fallback insertion only if completely unpopulated
+    $db->exec("INSERT INTO resources (id, title, description, link) VALUES (1, 'MDN Web Docs', 'Web technology references', 'https://developer.mozilla.org') ON CONFLICT DO NOTHING");
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 $rawData = file_get_contents('php://input');

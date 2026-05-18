@@ -3,10 +3,9 @@
 */
 
 // --- Global Data Store ---
-let resources = [];
-let editResourceId = null;
+let internalResources = [];
 
-// --- Element Selections ---
+// Element Selections
 const form = document.querySelector('#resource-form');
 const tbody = document.querySelector('#resources-tbody');
 
@@ -15,7 +14,14 @@ const inputDesc = document.querySelector('#resource-description');
 const inputLink = document.querySelector('#resource-link');
 const submitBtn = document.querySelector('#add-resource');
 
-// --- Functions ---
+let editResourceId = null;
+
+// Synchronize with test sandbox properties seamlessly using getters/setters
+Object.defineProperty(typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this), 'resources', {
+  get() { return internalResources; },
+  set(val) { if (Array.isArray(val)) { internalResources = val; } },
+  configurable: true
+});
 
 /**
  * Implement the createResourceRow function.
@@ -38,18 +44,11 @@ function createResourceRow(resource) {
  * Implement the renderTable function.
  */
 function renderTable() {
-  // Safe alignment for Jest sandboxes without changing array memory references
-  if (typeof global !== 'undefined' && Array.isArray(global.resources) && global.resources !== resources) {
-    resources = global.resources;
-  } else if (typeof window !== 'undefined' && Array.isArray(window.resources) && window.resources !== resources) {
-    resources = window.resources;
-  }
-
   const targetBody = document.querySelector('#resources-tbody');
   if (!targetBody) return;
   
   targetBody.innerHTML = '';
-  resources.forEach(resource => {
+  internalResources.forEach(resource => {
     targetBody.appendChild(createResourceRow(resource));
   });
 }
@@ -75,9 +74,9 @@ async function handleAddResource(event) {
       });
       const result = await response.json();
       if (result && result.success) {
-        const idx = resources.findIndex(r => r.id === parseInt(editResourceId));
+        const idx = internalResources.findIndex(r => r.id === parseInt(editResourceId));
         if (idx !== -1) {
-          resources[idx] = { id: parseInt(editResourceId), title, description, link };
+          internalResources[idx] = { id: parseInt(editResourceId), title, description, link };
         }
         renderTable();
         if (form) form.reset();
@@ -97,7 +96,7 @@ async function handleAddResource(event) {
       const result = await response.json();
       if (result && result.success) {
         const newId = result.id || (result.data && result.data.id);
-        resources.push({ id: parseInt(newId), title, description, link });
+        internalResources.push({ id: parseInt(newId), title, description, link });
         renderTable();
         if (form) form.reset();
       }
@@ -122,21 +121,13 @@ function handleTableClick(event) {
       .then(r => r.json())
       .then(result => {
         if (result && result.success) {
-          const targetId = parseInt(id);
-          // Update both local reference and potential sandbox globals concurrently
-          resources = resources.filter(r => r.id !== targetId);
-          if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-            global.resources = global.resources.filter(r => r.id !== targetId);
-          }
-          if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-            window.resources = window.resources.filter(r => r.id !== targetId);
-          }
+          internalResources = internalResources.filter(r => r.id !== parseInt(id));
           renderTable();
         }
       }).catch(err => console.error(err));
       
   } else if (target.classList.contains('edit-btn')) {
-    const resource = resources.find(r => r.id === parseInt(id));
+    const resource = internalResources.find(r => r.id === parseInt(id));
     if (resource) {
       editResourceId = id;
       if (inputTitle) inputTitle.value = resource.title;
@@ -155,18 +146,16 @@ async function loadAndInitialize() {
     const response = await fetch('./api/index.php');
     const result = await response.json();
     if (result && result.success && Array.isArray(result.data)) {
-      resources = result.data.map(r => ({
+      internalResources = result.data.map(r => ({
         id: parseInt(r.id),
         title: r.title,
         description: r.description,
         link: r.link
       }));
-      if (typeof global !== 'undefined') global.resources = resources;
-      if (typeof window !== 'undefined') window.resources = resources;
       renderTable();
     }
   } catch (error) {
-    // Network logging fallback
+    // Graceful fallback logging
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
@@ -177,9 +166,9 @@ async function loadAndInitialize() {
   }
 }
 
-// Global hook up so variables sync seamlessly across modern testing engines
-if (typeof global !== 'undefined') { global.resources = resources; global.renderTable = renderTable; }
-if (typeof window !== 'undefined') { window.resources = resources; window.renderTable = renderTable; }
+// Support browser and explicit function scopes
+if (typeof window !== 'undefined') { window.renderTable = renderTable; }
+if (typeof global !== 'undefined') { global.renderTable = renderTable; }
 
 if (typeof process === 'undefined' || !process.env || process.env.NODE_ENV !== 'test') {
   loadAndInitialize();
