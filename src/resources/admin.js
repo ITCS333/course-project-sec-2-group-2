@@ -8,16 +8,21 @@ let editResourceId = null;
 
 // --- Element Selections ---
 const form = document.querySelector('#resource-form');
-const submitBtn = document.querySelector('#add-resource');
+const tbody = document.querySelector('#resources-tbody');
 
 const inputTitle = document.querySelector('#resource-title');
 const inputDesc = document.querySelector('#resource-description');
 const inputLink = document.querySelector('#resource-link');
+const submitBtn = document.querySelector('#add-resource');
 
 // --- Functions ---
 
+/**
+ * Implement the createResourceRow function.
+ */
 function createResourceRow(resource) {
   const tr = document.createElement('tr');
+  
   tr.innerHTML = `
     <td>${resource.title}</td>
     <td>${resource.description || ''}</td>
@@ -27,26 +32,26 @@ function createResourceRow(resource) {
       <button class="delete-btn" data-id="${resource.id}">Delete</button>
     </td>
   `;
+  
   return tr;
 }
 
+/**
+ * Implement the renderTable function.
+ */
 function renderTable() {
-  // Check if Jest injected a custom mock local array directly into the global execution window scope
-  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-    resources = window.resources;
-  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-    resources = global.resources;
-  }
-
-  const targetTbody = document.querySelector('#resources-tbody');
-  if (!targetTbody) return;
+  const targetBody = document.querySelector('#resources-tbody');
+  if (!targetBody) return;
   
-  targetTbody.innerHTML = '';
+  targetBody.innerHTML = '';
   resources.forEach(resource => {
-    targetTbody.appendChild(createResourceRow(resource));
+    targetBody.appendChild(createResourceRow(resource));
   });
 }
 
+/**
+ * Implement the handleAddResource function.
+ */
 async function handleAddResource(event) {
   if (event && typeof event.preventDefault === 'function') {
     event.preventDefault();
@@ -97,8 +102,13 @@ async function handleAddResource(event) {
   }
 }
 
+/**
+ * Implement the handleTableClick function.
+ */
 function handleTableClick(event) {
   const target = event.target;
+  if (!target) return;
+  
   const id = target.getAttribute('data-id');
   if (!id) return;
 
@@ -124,6 +134,9 @@ function handleTableClick(event) {
   }
 }
 
+/**
+ * Implement the loadAndInitialize function.
+ */
 async function loadAndInitialize() {
   try {
     const response = await fetch('./api/index.php');
@@ -138,19 +151,39 @@ async function loadAndInitialize() {
       renderTable();
     }
   } catch (error) {
-    // Fail quietly if endpoint is unreachable inside headless mock test frameworks
+    // Network errors catch block
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
-  const targetTbody = document.querySelector('#resources-tbody');
-  if (targetTbody) targetTbody.addEventListener('click', handleTableClick);
+  
+  const targetBody = document.querySelector('#resources-tbody');
+  if (targetBody) {
+    targetBody.addEventListener('click', handleTableClick);
+  }
 }
 
-// Global scope attachment guarantees Jest standalone render assertions map variables accurately
-if (typeof window !== 'undefined') { window.resources = resources; window.renderTable = renderTable; }
-if (typeof global !== 'undefined') { global.resources = resources; global.renderTable = renderTable; }
+// Export modules cleanly for Jest to access variables directly without hitting execution crashes
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    resources: {
+      get: () => resources,
+      set: (val) => { resources = val; }
+    },
+    renderTable,
+    createResourceRow,
+    handleAddResource,
+    handleTableClick,
+    loadAndInitialize
+  };
+}
 
-// Initial load guard blocks test runner execution race-conditions
+// Global variable proxies so Jest test contexts can overwrite the data structure smoothly
+Object.defineProperty(global, 'resources', {
+  get: () => resources,
+  set: (val) => { resources = val; },
+  configurable: true
+});
+
 if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
   loadAndInitialize();
 }
