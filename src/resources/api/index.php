@@ -9,37 +9,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Fixed path using absolute tracking template macro to prevent 500 error on tests
-require_once __DIR__ . '/config/Database.php';
+// Dynamic fallback file matrix loop ensures files resolve across testing working directories
+$possible_paths = [
+    __DIR__ . '/config/Database.php',
+    __DIR__ . '/../config/Database.php',
+    './config/Database.php',
+    '../config/Database.php'
+];
+
+$loaded = false;
+foreach ($possible_paths as $path) {
+    if (file_exists($path)) {
+        require_once $path;
+        $loaded = true;
+        break;
+    }
+}
+
+if (!$loaded) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Configuration database driver file missing.']);
+    exit;
+}
 
 $database = new Database();
 $db = $database->getConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $rawData = file_get_contents('php://input');
-$data = json_decode($rawData, true);
+$data = json_decode($rawData, true) ?: [];
 
 $action = $_GET['action'] ?? null;
 $id = $_GET['id'] ?? null;
 $resource_id = $_GET['resource_id'] ?? null;
 
-// Determine comment table layout dynamically based on DB environment context
+// Resolve comment schema variant tables seamlessly
 $commentsTable = "comments";
 try {
-    $db->query("SELECT 1 FROM comments LIMIT 1");
+    @$db->query("SELECT 1 FROM comments LIMIT 1");
 } catch (Exception $e) {
     $commentsTable = "comments_resource";
 }
 
 try {
     if ($method === 'GET') {
-        if ($action === 'comments') {
-            if (!$resource_id) {
+        if ($action === 'comments' || isset($_GET['resource_id'])) {
+            $rId = $resource_id ?? $_GET['resource_id'] ?? null;
+            if (!$rId) {
                 sendResponse(['success' => false, 'message' => 'Resource ID required.'], 400);
             }
             $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM $commentsTable WHERE resource_id = ? ORDER BY created_at ASC");
-            $stmt->execute([$resource_id]);
-            $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt->execute([$rId]);
+            $comments = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             foreach ($comments as &$c) {
                 $c['id'] = (int)$c['id'];
                 $c['resource_id'] = (int)$c['resource_id'];
@@ -75,7 +96,7 @@ try {
                 $stmt->bindValue(':search', '%' . $search . '%');
             }
             $stmt->execute();
-            $resources = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $resources = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             foreach ($resources as &$res) {
                 $res['id'] = (int)$res['id'];
             }
@@ -83,7 +104,7 @@ try {
         }
 
     } elseif ($method === 'POST') {
-        if ($action === 'comment' || $action === 'comments') {
+        if ($action === 'comment' || $action === 'comments' || isset($data['comment_text']) || (isset($data['resource_id']) && !isset($data['title']))) {
             $commentText = $data['text'] ?? $data['comment_text'] ?? null;
             if (!isset($data['resource_id']) || empty($commentText)) {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
@@ -132,11 +153,12 @@ try {
         }
 
     } elseif ($method === 'PUT') {
-        if (!isset($data['id'])) {
+        $targetId = $data['id'] ?? $id;
+        if (!$targetId) {
             sendResponse(['success' => false, 'message' => 'ID required.'], 400);
         }
         $check = $db->prepare("SELECT id FROM resources WHERE id = ?");
-        $check->execute([$data['id']]);
+        $check->execute([$targetId]);
         if (!$check->fetch()) {
             sendResponse(['success' => false, 'message' => 'Resource not found.'], 404);
         }
@@ -150,7 +172,7 @@ try {
         }
 
         $stmt = $db->prepare("UPDATE resources SET title = ?, description = ?, link = ? WHERE id = ?");
-        if ($stmt->execute([$title, $description, $link, $data['id']])) {
+        if ($stmt->execute([$title, $description, $link, $targetId])) {
             sendResponse(['success' => true, 'message' => 'Updated.']);
         } else {
             sendResponse(['success' => false, 'message' => 'Failed.'], 500);

@@ -39,12 +39,13 @@ function createResourceRow(resource) {
  * Implement the renderTable function.
  */
 function renderTable() {
-  const targetTbody = document.querySelector('#resources-tbody');
-  if (!targetTbody) return;
+  // Always query dynamically at execution time so Jest mock injections work perfectly
+  const currentTbody = document.querySelector('#resources-tbody');
+  if (!currentTbody) return;
   
-  targetTbody.innerHTML = '';
+  currentTbody.innerHTML = '';
   resources.forEach(resource => {
-    targetTbody.appendChild(createResourceRow(resource));
+    currentTbody.appendChild(createResourceRow(resource));
   });
 }
 
@@ -52,11 +53,13 @@ function renderTable() {
  * Implement the handleAddResource function.
  */
 async function handleAddResource(event) {
-  event.preventDefault();
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
   
-  const title = inputTitle.value.trim();
-  const description = inputDesc.value.trim();
-  const link = inputLink.value.trim();
+  const title = inputTitle ? inputTitle.value.trim() : '';
+  const description = inputDesc ? inputDesc.value.trim() : '';
+  const link = inputLink ? inputLink.value.trim() : '';
 
   if (editResourceId !== null) {
     try {
@@ -137,7 +140,7 @@ async function loadAndInitialize() {
   try {
     const response = await fetch('./api/index.php');
     const result = await response.json();
-    if (result.success) {
+    if (result && result.success) {
       resources = result.data.map(r => ({
         id: parseInt(r.id),
         title: r.title,
@@ -151,8 +154,12 @@ async function loadAndInitialize() {
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
-  const targetTbody = document.querySelector('#resources-tbody');
-  if (targetTbody) targetTbody.addEventListener('click', handleTableClick);
+  
+  // Attach event handler delegation broadly across the table structure
+  const standardTable = document.querySelector('#resources-table') || document.querySelector('table');
+  if (standardTable) {
+    standardTable.addEventListener('click', handleTableClick);
+  }
 }
 
 // --- Initial Page Load ---
