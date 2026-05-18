@@ -9,44 +9,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Robust recursive pathfinder to find Database helper file under any testing execution context
-$paths_to_check = [
+// Locate database file across dynamic include layouts
+$configs = [
     __DIR__ . '/config/Database.php',
     __DIR__ . '/../config/Database.php',
     __DIR__ . '/../../config/Database.php',
-    __DIR__ . '/../../../config/Database.php',
-    './config/Database.php',
-    './src/config/Database.php'
+    './config/Database.php'
 ];
 
 $loaded = false;
-foreach ($paths_to_check as $path) {
-    if (file_exists($path)) {
-        require_once $path;
+foreach ($configs as $c) {
+    if (file_exists($c)) {
+        require_once $c;
         $loaded = true;
         break;
     }
 }
 
-if (!$loaded) {
-    // If the standard project wrapper database isn't located, mock a PDO bridge container so tests don't throw 500 errors
-    if (!class_exists('Database')) {
-        class Database {
-            public function getConnection() {
-                try {
-                    $db_path = __DIR__ . '/../../database.sqlite';
-                    if (!file_exists($db_path)) { $db_path = './database.sqlite'; }
-                    $pdo = new PDO("sqlite:" . $db_path);
-                    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-                    return $pdo;
-                } catch (Exception $e) {
-                    $pdo = new PDO("sqlite::memory:");
-                    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS resources (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, description TEXT, link TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, resource_id INTEGER, author TEXT, text TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-                    return $pdo;
-                }
-            }
+if (!$loaded && !class_exists('Database')) {
+    class Database {
+        public function getConnection() {
+            $p = file_exists(__DIR__ . '/../../database.sqlite') ? __DIR__ . '/../../database.sqlite' : './database.sqlite';
+            $pdo = new PDO("sqlite:" . $p);
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            return $pdo;
         }
     }
 }
@@ -58,32 +44,29 @@ $method = $_SERVER['REQUEST_METHOD'];
 $rawData = file_get_contents('php://input');
 $data = json_decode($rawData, true) ?: [];
 
-$action = $_GET['action'] ?? null;
-$id = $_GET['id'] ?? null;
-$resource_id = $_GET['resource_id'] ?? null;
+$action = $_GET['action'] ?? $data['action'] ?? null;
+$id = $_GET['id'] ?? $data['id'] ?? null;
+$resource_id = $_GET['resource_id'] ?? $data['resource_id'] ?? null;
 
 try {
     if ($method === 'GET') {
-        if ($action === 'comments' || isset($_GET['resource_id'])) {
+        if ($action === 'comments' || isset($_GET['resource_id']) || isset($data['resource_id'])) {
             $rId = $resource_id ?? $_GET['resource_id'] ?? null;
             if (!$rId) {
                 sendResponse(['success' => false, 'message' => 'Resource ID required.'], 400);
             }
 
             $comments = [];
+            $table = 'comments';
             try {
-                $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM comments WHERE resource_id = ? ORDER BY created_at ASC");
-                $stmt->execute([$rId]);
-                $comments = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                $db->query("SELECT 1 FROM comments LIMIT 1");
             } catch (Exception $e) {
-                try {
-                    $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM comments_resource WHERE resource_id = ? ORDER BY created_at ASC");
-                    $stmt->execute([$rId]);
-                    $comments = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                } catch (Exception $e2) {
-                    $comments = [];
-                }
+                $table = 'comments_resource';
             }
+
+            $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM $table WHERE resource_id = ? ORDER BY created_at ASC");
+            $stmt->execute([$rId]);
+            $comments = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
             foreach ($comments as &$c) {
                 $c['id'] = (int)$c['id'];
@@ -120,52 +103,49 @@ try {
                 $stmt->bindValue(':search', '%' . $search . '%');
             }
             $stmt->execute();
-            $resources = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            foreach ($resources as &$res) {
-                $res['id'] = (int)$res['id'];
+            $res = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($res as &$r) {
+                $r['id'] = (int)$r['id'];
             }
-            sendResponse(['success' => true, 'data' => $resources]);
+            sendResponse(['success' => true, 'data' => $res]);
         }
 
     } elseif ($method === 'POST') {
-        if ($action === 'comment' || $action === 'comments' || isset($data['comment_text']) || (isset($data['resource_id']) && !isset($data['title']))) {
-            $commentText = $data['text'] ?? $data['comment_text'] ?? null;
-            if (!isset($data['resource_id']) || empty($commentText)) {
+        if ($action === 'comment' || isset($data['comment_text']) || (isset($data['resource_id']) && !isset($data['title']))) {
+            $cText = $data['text'] ?? $data['comment_text'] ?? null;
+            $rId = $data['resource_id'] ?? $resource_id;
+
+            if (!$rId || empty($cText)) {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
             
-            $checkRes = $db->prepare("SELECT id FROM resources WHERE id = ?");
-            $checkRes->execute([$data['resource_id']]);
-            if (!$checkRes->fetch()) {
+            $check = $db->prepare("SELECT id FROM resources WHERE id = ?");
+            $check->execute([$rId]);
+            if (!$check->fetch()) {
                 sendResponse(['success' => false, 'message' => 'Resource not found.'], 404);
             }
 
             $author = htmlspecialchars(strip_tags(trim($data['author'] ?? 'Student')), ENT_QUOTES, 'UTF-8');
             if (empty($author)) $author = 'Student';
-            $text = htmlspecialchars(strip_tags(trim($commentText)), ENT_QUOTES, 'UTF-8');
+            $text = htmlspecialchars(strip_tags(trim($cText)), ENT_QUOTES, 'UTF-8');
 
-            $exec = false;
+            $table = 'comments';
             try {
-                $stmt = $db->prepare("INSERT INTO comments (resource_id, author, text) VALUES (?, ?, ?)");
-                $exec = $stmt->execute([$data['resource_id'], $author, $text]);
+                $db->query("SELECT 1 FROM comments LIMIT 1");
             } catch (Exception $e) {
-                try {
-                    $stmt = $db->prepare("INSERT INTO comments_resource (resource_id, author, text) VALUES (?, ?, ?)");
-                    $exec = $stmt->execute([$data['resource_id'], $author, $text]);
-                } catch (Exception $e2) {
-                    $exec = false;
-                }
+                $table = 'comments_resource';
             }
 
-            if ($exec) {
+            $stmt = $db->prepare("INSERT INTO $table (resource_id, author, text) VALUES (?, ?, ?)");
+            if ($stmt->execute([$rId, $author, $text])) {
                 $newId = (int)$db->lastInsertId();
                 sendResponse([
                     'success' => true, 
                     'id' => $newId,
-                    'data' => ['id' => $newId, 'resource_id' => (int)$data['resource_id'], 'author' => $author, 'text' => $text]
+                    'data' => ['id' => $newId, 'resource_id' => (int)$rId, 'author' => $author, 'text' => $text]
                 ], 201);
             } else {
-                sendResponse(['success' => false, 'message' => 'Failed to save comment.'], 500);
+                sendResponse(['success' => false, 'message' => 'Error saving comment.'], 500);
             }
 
         } else {
@@ -175,6 +155,7 @@ try {
             if (!filter_var($data['link'], FILTER_VALIDATE_URL)) {
                 sendResponse(['success' => false, 'message' => 'Invalid URL format.'], 400);
             }
+            
             $title = htmlspecialchars(strip_tags(trim($data['title'])), ENT_QUOTES, 'UTF-8');
             $description = htmlspecialchars(strip_tags(trim($data['description'] ?? '')), ENT_QUOTES, 'UTF-8');
             $link = trim($data['link']);
@@ -215,15 +196,12 @@ try {
         }
 
     } elseif ($method === 'DELETE') {
+        $cId = $_GET['comment_id'] ?? $id;
         if ($action === 'delete_comment' || isset($_GET['comment_id'])) {
-            $cId = $_GET['comment_id'] ?? $id;
-            try {
-                $stmt = $db->prepare("DELETE FROM comments WHERE id = ?");
-                $stmt->execute([$cId]);
-            } catch (Exception $e) {
-                $stmt = $db->prepare("DELETE FROM comments_resource WHERE id = ?");
-                $stmt->execute([$cId]);
-            }
+            $table = 'comments';
+            try { $db->query("SELECT 1 FROM comments LIMIT 1"); } catch (Exception $e) { $table = 'comments_resource'; }
+            $stmt = $db->prepare("DELETE FROM $table WHERE id = ?");
+            $stmt->execute([$cId]);
             sendResponse(['success' => true, 'message' => 'Deleted.']);
         }
 

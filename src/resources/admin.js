@@ -22,7 +22,6 @@ const submitBtn = document.querySelector('#add-resource');
  */
 function createResourceRow(resource) {
   const tr = document.createElement('tr');
-  
   tr.innerHTML = `
     <td>${resource.title}</td>
     <td>${resource.description || ''}</td>
@@ -32,7 +31,6 @@ function createResourceRow(resource) {
       <button class="delete-btn" data-id="${resource.id}">Delete</button>
     </td>
   `;
-  
   return tr;
 }
 
@@ -91,7 +89,7 @@ async function handleAddResource(event) {
       });
       const result = await response.json();
       if (result && result.success) {
-        const newId = result.id;
+        const newId = result.id || (result.data && result.data.id);
         resources.push({ id: parseInt(newId), title, description, link });
         renderTable();
         if (form) form.reset();
@@ -106,7 +104,7 @@ async function handleAddResource(event) {
  * Implement the handleTableClick function.
  */
 function handleTableClick(event) {
-  const target = event.target;
+  const target = event ? event.target : null;
   if (!target) return;
   
   const id = target.getAttribute('data-id');
@@ -151,7 +149,7 @@ async function loadAndInitialize() {
       renderTable();
     }
   } catch (error) {
-    // Network errors catch block
+    // Network logging catch block
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
@@ -162,28 +160,7 @@ async function loadAndInitialize() {
   }
 }
 
-// Export modules cleanly for Jest to access variables directly without hitting execution crashes
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    resources: {
-      get: () => resources,
-      set: (val) => { resources = val; }
-    },
-    renderTable,
-    createResourceRow,
-    handleAddResource,
-    handleTableClick,
-    loadAndInitialize
-  };
-}
-
-// Global variable proxies so Jest test contexts can overwrite the data structure smoothly
-Object.defineProperty(global, 'resources', {
-  get: () => resources,
-  set: (val) => { resources = val; },
-  configurable: true
-});
-
-if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
+// Ensure execution happens in browser environment or normal script evaluations
+if (typeof process === 'undefined' || !process.env || process.env.NODE_ENV !== 'test') {
   loadAndInitialize();
 }
