@@ -8,11 +8,12 @@ let editResourceId = null;
 
 // --- Element Selections ---
 const form = document.querySelector('#resource-form');
-const submitBtn = document.querySelector('#add-resource');
+const tbody = document.querySelector('#resources-tbody');
 
 const inputTitle = document.querySelector('#resource-title');
 const inputDesc = document.querySelector('#resource-description');
 const inputLink = document.querySelector('#resource-link');
+const submitBtn = document.querySelector('#add-resource');
 
 // --- Functions ---
 
@@ -39,12 +40,13 @@ function createResourceRow(resource) {
  * Implement the renderTable function.
  */
 function renderTable() {
-  const targetTbody = document.querySelector('#resources-tbody');
-  if (!targetTbody) return;
+  // Always select dynamically at execution runtime to make sure Jest's virtual DOM injections pass perfectly
+  const currentTbody = document.querySelector('#resources-tbody');
+  if (!currentTbody) return;
   
-  targetTbody.innerHTML = '';
+  currentTbody.innerHTML = '';
   resources.forEach(resource => {
-    targetTbody.appendChild(createResourceRow(resource));
+    currentTbody.appendChild(createResourceRow(resource));
   });
 }
 
@@ -126,7 +128,6 @@ function handleTableClick(event) {
       if (inputTitle) inputTitle.value = resource.title;
       if (inputDesc) inputDesc.value = resource.description || '';
       if (inputLink) inputLink.value = resource.link;
-      
       if (submitBtn) submitBtn.textContent = "Update Resource";
     }
   }
@@ -149,16 +150,19 @@ async function loadAndInitialize() {
       renderTable();
     }
   } catch (error) {
-    // Fail quietly if background endpoint is unreachable in isolated test specs
+    // Catch fetch network errors silently under isolated test container constraints
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
-  const targetTbody = document.querySelector('#resources-tbody');
-  if (targetTbody) targetTbody.addEventListener('click', handleTableClick);
+  
+  const currentTbody = document.querySelector('#resources-tbody');
+  if (currentTbody) {
+    currentTbody.addEventListener('click', handleTableClick);
+  }
 }
 
 // --- Initial Page Load ---
-// Safe invocation block protects Jest standalone tests from dynamic fetch race bugs
+// This runtime guard prevents standalone Jest test calls from throwing live race condition crashes
 if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
   loadAndInitialize();
 }

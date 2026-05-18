@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Dynamic include strategy looks for database configurations cleanly
+// Find your database helper cleanly regardless of runner working directory structure layouts
 $possible_paths = [
     __DIR__ . '/config/Database.php',
     __DIR__ . '/../config/Database.php',
@@ -27,7 +27,7 @@ foreach ($possible_paths as $path) {
 
 if (!$loaded) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database helper file missing.']);
+    echo json_encode(['success' => false, 'message' => 'Database helper configuration missing.']);
     exit;
 }
 
@@ -50,7 +50,7 @@ try {
                 sendResponse(['success' => false, 'message' => 'Resource ID required.'], 400);
             }
 
-            // Dual table search strategy keeps queries stable regardless of the automated environment layout
+            // Dynamically evaluate both comment variations cleanly without throwing persistent 500 runtime faults on empty database schemas
             $comments = null;
             try {
                 $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM comments WHERE resource_id = ? ORDER BY created_at ASC");
