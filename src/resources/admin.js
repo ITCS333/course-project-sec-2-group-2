@@ -4,6 +4,7 @@
 
 // --- Global Data Store ---
 let resources = [];
+let editResourceId = null; // Keeps track of active resource ID being edited
 
 // --- Element Selections ---
 const form = document.querySelector('#resource-form');
@@ -56,21 +57,46 @@ async function handleAddResource(event) {
   const description = inputDesc.value.trim();
   const link = inputLink.value.trim();
 
-  try {
-    const response = await fetch('./api/index.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, link })
-    });
-    const result = await response.json();
-    if (result.success) {
-      const newId = result.id;
-      resources.push({ id: parseInt(newId), title, description, link });
-      renderTable();
-      form.reset();
+  if (editResourceId !== null) {
+    // Mode: PUT Update
+    try {
+      const response = await fetch('./api/index.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: parseInt(editResourceId), title, description, link })
+      });
+      const result = await response.json();
+      if (result.success) {
+        const idx = resources.findIndex(r => r.id === parseInt(editResourceId));
+        if (idx !== -1) {
+          resources[idx] = { id: parseInt(editResourceId), title, description, link };
+        }
+        renderTable();
+        form.reset();
+        editResourceId = null;
+        if (submitBtn) submitBtn.textContent = "Add Resource";
+      }
+    } catch (error) {
+      console.error(error);
     }
-  } catch (error) {
-    console.error(error);
+  } else {
+    // Mode: POST Insert
+    try {
+      const response = await fetch('./api/index.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, link })
+      });
+      const result = await response.json();
+      if (result.success) {
+        const newId = result.id;
+        resources.push({ id: parseInt(newId), title, description, link });
+        renderTable();
+        form.reset();
+      }
+    } catch (error) {
+      console.error(error);
+    }
   }
 }
 
@@ -95,44 +121,12 @@ function handleTableClick(event) {
   } else if (target.classList.contains('edit-btn')) {
     const resource = resources.find(r => r.id === parseInt(id));
     if (resource) {
+      editResourceId = id;
       if (inputTitle) inputTitle.value = resource.title;
       if (inputDesc) inputDesc.value = resource.description || '';
       if (inputLink) inputLink.value = resource.link;
       
       if (submitBtn) submitBtn.textContent = "Update Resource";
-      
-      const handleEditSubmit = async (e) => {
-        e.preventDefault();
-        const updatedTitle = inputTitle.value.trim();
-        const updatedDesc = inputDesc.value.trim();
-        const updatedLink = inputLink.value.trim();
-
-        try {
-          const response = await fetch('./api/index.php', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: parseInt(id), title: updatedTitle, description: updatedDesc, link: updatedLink })
-          });
-          const result = await response.json();
-          if (result.success) {
-            const idx = resources.findIndex(r => r.id === parseInt(id));
-            if (idx !== -1) {
-              resources[idx] = { id: parseInt(id), title: updatedTitle, description: updatedDesc, link: updatedLink };
-            }
-            renderTable();
-            form.reset();
-            if (submitBtn) submitBtn.textContent = "Add Resource";
-            
-            form.removeEventListener('submit', handleEditSubmit);
-            form.addEventListener('submit', handleAddResource);
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      };
-      
-      form.removeEventListener('submit', handleAddResource);
-      form.addEventListener('submit', handleEditSubmit);
     }
   }
 }

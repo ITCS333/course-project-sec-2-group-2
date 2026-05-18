@@ -21,27 +21,22 @@ $data = json_decode($rawData, true);
 $action = $_GET['action'] ?? null;
 $id = $_GET['id'] ?? null;
 $resource_id = $_GET['resource_id'] ?? null;
-$comment_id = $_GET['comment_id'] ?? null;
 
-// Helper to deduce comments table name dynamically based on database state
-function getCommentsTableName($db) {
-    try {
-        $db->query("SELECT 1 FROM comments LIMIT 1");
-        return "comments";
-    } catch (Exception $e) {
-        return "comments_resource";
-    }
+// Determine table name dynamically safely
+$commentsTable = "comments";
+try {
+    $db->query("SELECT 1 FROM comments LIMIT 1");
+} catch (Exception $e) {
+    $commentsTable = "comments_resource";
 }
 
 try {
     if ($method === 'GET') {
         if ($action === 'comments') {
-            if (!$resource_id || !is_numeric($resource_id)) {
-                sendResponse(['success' => false, 'message' => 'Invalid resource ID.'], 400);
+            if (!$resource_id) {
+                sendResponse(['success' => false, 'message' => 'Resource ID required.'], 400);
             }
-            
-            $tbl = getCommentsTableName($db);
-            $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM $tbl WHERE resource_id = ? ORDER BY created_at ASC");
+            $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM $commentsTable WHERE resource_id = ? ORDER BY created_at ASC");
             $stmt->execute([$resource_id]);
             $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($comments as &$c) {
@@ -51,9 +46,6 @@ try {
             sendResponse(['success' => true, 'data' => $comments]);
 
         } elseif ($id) {
-            if (!is_numeric($id)) {
-                sendResponse(['success' => false, 'message' => 'Invalid ID.'], 400);
-            }
             $stmt = $db->prepare("SELECT id, title, description, link, created_at FROM resources WHERE id = ?");
             $stmt->execute([$id]);
             $resource = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -96,7 +88,7 @@ try {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
             
-            // Core Verification: Verify parent resource exists to satisfy Test #21
+            // Explicitly assert parent resource presence
             $checkRes = $db->prepare("SELECT id FROM resources WHERE id = ?");
             $checkRes->execute([$data['resource_id']]);
             if (!$checkRes->fetch()) {
@@ -104,27 +96,19 @@ try {
             }
 
             $author = htmlspecialchars(strip_tags(trim($data['author'] ?? 'Student')), ENT_QUOTES, 'UTF-8');
-            if (empty($author)) { $author = 'Student'; }
+            if (empty($author)) $author = 'Student';
             $text = htmlspecialchars(strip_tags(trim($commentText)), ENT_QUOTES, 'UTF-8');
 
-            $tbl = getCommentsTableName($db);
-            $stmt = $db->prepare("INSERT INTO $tbl (resource_id, author, text) VALUES (?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO $commentsTable (resource_id, author, text) VALUES (?, ?, ?)");
             if ($stmt->execute([$data['resource_id'], $author, $text])) {
                 $newId = (int)$db->lastInsertId();
                 sendResponse([
                     'success' => true, 
-                    'message' => 'Comment added.', 
                     'id' => $newId,
-                    'data' => [
-                        'id' => $newId, 
-                        'resource_id' => (int)$data['resource_id'], 
-                        'author' => $author, 
-                        'text' => $text,
-                        'comment_text' => $text
-                    ]
+                    'data' => ['id' => $newId, 'resource_id' => (int)$data['resource_id'], 'author' => $author, 'text' => $text]
                 ], 201);
             } else {
-                sendResponse(['success' => false, 'message' => 'Could not add comment.'], 500);
+                sendResponse(['success' => false, 'message' => 'Error.'], 500);
             }
 
         } else {
@@ -141,14 +125,9 @@ try {
             $stmt = $db->prepare("INSERT INTO resources (title, description, link) VALUES (?, ?, ?)");
             if ($stmt->execute([$title, $description, $link])) {
                 $newId = (int)$db->lastInsertId();
-                sendResponse([
-                    'success' => true, 
-                    'id' => $newId,
-                    'message' => 'Resource created.',
-                    'data' => ['id' => $newId, 'title' => $title, 'description' => $description, 'link' => $link]
-                ], 201);
+                sendResponse(['success' => true, 'id' => $newId, 'data' => ['id' => $newId, 'title' => $title, 'description' => $description, 'link' => $link]], 201);
             } else {
-                sendResponse(['success' => false, 'message' => 'Database error.'], 500);
+                sendResponse(['success' => false, 'message' => 'Error.'], 500);
             }
         }
 
@@ -167,41 +146,40 @@ try {
         $link = trim($data['link'] ?? '');
 
         if (empty($title) || empty($link) || !filter_var($link, FILTER_VALIDATE_URL)) {
-            sendResponse(['success' => false, 'message' => 'Invalid input data.'], 400);
+            sendResponse(['success' => false, 'message' => 'Invalid input.'], 400);
         }
 
         $stmt = $db->prepare("UPDATE resources SET title = ?, description = ?, link = ? WHERE id = ?");
         if ($stmt->execute([$title, $description, $link, $data['id']])) {
-            sendResponse(['success' => true, 'message' => 'Resource updated.']);
+            sendResponse(['success' => true, 'message' => 'Updated.']);
         } else {
-            sendResponse(['success' => false, 'message' => 'Update failed.'], 500);
+            sendResponse(['success' => false, 'message' => 'Failed.'], 500);
         }
 
     } elseif ($method === 'DELETE') {
-        // Distinguish if query deletes a comment or resource dynamically
-        $tbl = getCommentsTableName($db);
-        $targetCommentId = $_GET['comment_id'] ?? $id;
-
-        // Check if deleting comment action
-        if ($action === 'delete_comment' || $comment_id) {
-            $cId = $comment_id ?? $targetCommentId;
-            $stmt = $db->prepare("DELETE FROM $tbl WHERE id = ?");
+        if ($action === 'delete_comment' || isset($_GET['comment_id'])) {
+            $cId = $_GET['comment_id'] ?? $id;
+            $checkComment = $db->prepare("SELECT id FROM $commentsTable WHERE id = ?");
+            $checkComment->execute([$cId]);
+            if (!$checkComment->fetch()) {
+                sendResponse(['success' => false, 'message' => 'Comment not found.'], 404);
+            }
+            $stmt = $db->prepare("DELETE FROM $commentsTable WHERE id = ?");
             $stmt->execute([$cId]);
-            sendResponse(['success' => true, 'message' => 'Comment deleted.']);
+            sendResponse(['success' => true, 'message' => 'Deleted.']);
         }
 
-        // Standard Resource deletion
-        if (!$id || !is_numeric($id)) {
-            sendResponse(['success' => false, 'message' => 'Invalid ID.'], 400);
+        if (!$id) {
+            sendResponse(['success' => false, 'message' => 'ID required.'], 400);
         }
-        
-        $stmt = $db->prepare("DELETE FROM resources WHERE id = ?");
-        $stmt->execute([$id]);
-        if ($stmt->rowCount() > 0) {
-            sendResponse(['success' => true, 'message' => 'Resource deleted.']);
-        } else {
+        $checkRes = $db->prepare("SELECT id FROM resources WHERE id = ?");
+        $checkRes->execute([$id]);
+        if (!$checkRes->fetch()) {
             sendResponse(['success' => false, 'message' => 'Resource not found.'], 404);
         }
+        $stmt = $db->prepare("DELETE FROM resources WHERE id = ?");
+        $stmt->execute([$id]);
+        sendResponse(['success' => true, 'message' => 'Deleted.']);
     } else {
         sendResponse(['success' => false, 'message' => 'Method not allowed.'], 405);
     }
