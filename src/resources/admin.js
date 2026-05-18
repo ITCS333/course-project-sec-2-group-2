@@ -3,7 +3,8 @@
 */
 
 // --- Global Data Store ---
-let internalResources = [];
+if (typeof window !== 'undefined' && !window.resources) { window.resources = []; }
+if (typeof global !== 'undefined' && !global.resources) { global.resources = []; }
 
 // Element Selections
 const form = document.querySelector('#resource-form');
@@ -15,13 +16,6 @@ const inputLink = document.querySelector('#resource-link');
 const submitBtn = document.querySelector('#add-resource');
 
 let editResourceId = null;
-
-// Synchronize with test sandbox properties seamlessly using getters/setters
-Object.defineProperty(typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this), 'resources', {
-  get() { return internalResources; },
-  set(val) { if (Array.isArray(val)) { internalResources = val; } },
-  configurable: true
-});
 
 /**
  * Implement the createResourceRow function.
@@ -48,7 +42,16 @@ function renderTable() {
   if (!targetBody) return;
   
   targetBody.innerHTML = '';
-  internalResources.forEach(resource => {
+  
+  // Directly read from whatever global scope Jest or the browser populated
+  let activeResources = [];
+  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
+    activeResources = window.resources;
+  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
+    activeResources = global.resources;
+  }
+
+  activeResources.forEach(resource => {
     targetBody.appendChild(createResourceRow(resource));
   });
 }
@@ -65,6 +68,8 @@ async function handleAddResource(event) {
   const description = inputDesc ? inputDesc.value.trim() : '';
   const link = inputLink ? inputLink.value.trim() : '';
 
+  let activeResources = typeof window !== 'undefined' && Array.isArray(window.resources) ? window.resources : (typeof global !== 'undefined' && Array.isArray(global.resources) ? global.resources : []);
+
   if (editResourceId !== null) {
     try {
       const response = await fetch('./api/index.php', {
@@ -74,9 +79,9 @@ async function handleAddResource(event) {
       });
       const result = await response.json();
       if (result && result.success) {
-        const idx = internalResources.findIndex(r => r.id === parseInt(editResourceId));
+        const idx = activeResources.findIndex(r => r.id === parseInt(editResourceId));
         if (idx !== -1) {
-          internalResources[idx] = { id: parseInt(editResourceId), title, description, link };
+          activeResources[idx] = { id: parseInt(editResourceId), title, description, link };
         }
         renderTable();
         if (form) form.reset();
@@ -96,7 +101,7 @@ async function handleAddResource(event) {
       const result = await response.json();
       if (result && result.success) {
         const newId = result.id || (result.data && result.data.id);
-        internalResources.push({ id: parseInt(newId), title, description, link });
+        activeResources.push({ id: parseInt(newId), title, description, link });
         renderTable();
         if (form) form.reset();
       }
@@ -116,18 +121,26 @@ function handleTableClick(event) {
   const id = target.getAttribute('data-id');
   if (!id) return;
 
+  let activeResources = typeof window !== 'undefined' && Array.isArray(window.resources) ? window.resources : (typeof global !== 'undefined' && Array.isArray(global.resources) ? global.resources : []);
+
   if (target.classList.contains('delete-btn')) {
     fetch(`./api/index.php?id=${id}`, { method: 'DELETE' })
       .then(r => r.json())
       .then(result => {
         if (result && result.success) {
-          internalResources = internalResources.filter(r => r.id !== parseInt(id));
+          const targetId = parseInt(id);
+          if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
+            window.resources = window.resources.filter(r => r.id !== targetId);
+          }
+          if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
+            global.resources = global.resources.filter(r => r.id !== targetId);
+          }
           renderTable();
         }
       }).catch(err => console.error(err));
       
   } else if (target.classList.contains('edit-btn')) {
-    const resource = internalResources.find(r => r.id === parseInt(id));
+    const resource = activeResources.find(r => r.id === parseInt(id));
     if (resource) {
       editResourceId = id;
       if (inputTitle) inputTitle.value = resource.title;
@@ -146,16 +159,18 @@ async function loadAndInitialize() {
     const response = await fetch('./api/index.php');
     const result = await response.json();
     if (result && result.success && Array.isArray(result.data)) {
-      internalResources = result.data.map(r => ({
+      const parsed = result.data.map(r => ({
         id: parseInt(r.id),
         title: r.title,
         description: r.description,
         link: r.link
       }));
+      if (typeof window !== 'undefined') window.resources = parsed;
+      if (typeof global !== 'undefined') global.resources = parsed;
       renderTable();
     }
   } catch (error) {
-    // Graceful fallback logging
+    // Graceful catch block
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
@@ -166,9 +181,9 @@ async function loadAndInitialize() {
   }
 }
 
-// Support browser and explicit function scopes
-if (typeof window !== 'undefined') { window.renderTable = renderTable; }
-if (typeof global !== 'undefined') { global.renderTable = renderTable; }
+// Support explicit exposure across environments
+if (typeof window !== 'undefined') { window.renderTable = renderTable; window.handleTableClick = handleTableClick; window.handleAddResource = handleAddResource; }
+if (typeof global !== 'undefined') { global.renderTable = renderTable; global.handleTableClick = handleTableClick; global.handleAddResource = handleAddResource; }
 
 if (typeof process === 'undefined' || !process.env || process.env.NODE_ENV !== 'test') {
   loadAndInitialize();
