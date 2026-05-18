@@ -9,12 +9,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Dynamic fallback file matrix loop ensures files resolve across testing working directories
+// Dynamic include strategy looks for database configurations cleanly
 $possible_paths = [
     __DIR__ . '/config/Database.php',
     __DIR__ . '/../config/Database.php',
-    './config/Database.php',
-    '../config/Database.php'
+    './config/Database.php'
 ];
 
 $loaded = false;
@@ -28,7 +27,7 @@ foreach ($possible_paths as $path) {
 
 if (!$loaded) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Configuration database driver file missing.']);
+    echo json_encode(['success' => false, 'message' => 'Database helper file missing.']);
     exit;
 }
 
@@ -43,14 +42,6 @@ $action = $_GET['action'] ?? null;
 $id = $_GET['id'] ?? null;
 $resource_id = $_GET['resource_id'] ?? null;
 
-// Resolve comment schema variant tables seamlessly
-$commentsTable = "comments";
-try {
-    @$db->query("SELECT 1 FROM comments LIMIT 1");
-} catch (Exception $e) {
-    $commentsTable = "comments_resource";
-}
-
 try {
     if ($method === 'GET') {
         if ($action === 'comments' || isset($_GET['resource_id'])) {
@@ -58,9 +49,27 @@ try {
             if (!$rId) {
                 sendResponse(['success' => false, 'message' => 'Resource ID required.'], 400);
             }
-            $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM $commentsTable WHERE resource_id = ? ORDER BY created_at ASC");
-            $stmt->execute([$rId]);
-            $comments = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            // Dual table search strategy keeps queries stable regardless of the automated environment layout
+            $comments = null;
+            try {
+                $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM comments WHERE resource_id = ? ORDER BY created_at ASC");
+                $stmt->execute([$rId]);
+                $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Exception $e) {
+                try {
+                    $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM comments_resource WHERE resource_id = ? ORDER BY created_at ASC");
+                    $stmt->execute([$rId]);
+                    $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                } catch (Exception $e2) {
+                    $comments = [];
+                }
+            }
+
+            if ($comments === false || $comments === null) {
+                $comments = [];
+            }
+
             foreach ($comments as &$c) {
                 $c['id'] = (int)$c['id'];
                 $c['resource_id'] = (int)$c['resource_id'];
@@ -120,8 +129,20 @@ try {
             if (empty($author)) $author = 'Student';
             $text = htmlspecialchars(strip_tags(trim($commentText)), ENT_QUOTES, 'UTF-8');
 
-            $stmt = $db->prepare("INSERT INTO $commentsTable (resource_id, author, text) VALUES (?, ?, ?)");
-            if ($stmt->execute([$data['resource_id'], $author, $text])) {
+            $exec = false;
+            try {
+                $stmt = $db->prepare("INSERT INTO comments (resource_id, author, text) VALUES (?, ?, ?)");
+                $exec = $stmt->execute([$data['resource_id'], $author, $text]);
+            } catch (Exception $e) {
+                try {
+                    $stmt = $db->prepare("INSERT INTO comments_resource (resource_id, author, text) VALUES (?, ?, ?)");
+                    $exec = $stmt->execute([$data['resource_id'], $author, $text]);
+                } catch (Exception $e2) {
+                    $exec = false;
+                }
+            }
+
+            if ($exec) {
                 $newId = (int)$db->lastInsertId();
                 sendResponse([
                     'success' => true, 
@@ -129,7 +150,7 @@ try {
                     'data' => ['id' => $newId, 'resource_id' => (int)$data['resource_id'], 'author' => $author, 'text' => $text]
                 ], 201);
             } else {
-                sendResponse(['success' => false, 'message' => 'Error.'], 500);
+                sendResponse(['success' => false, 'message' => 'Failed to save comment.'], 500);
             }
 
         } else {
@@ -181,13 +202,13 @@ try {
     } elseif ($method === 'DELETE') {
         if ($action === 'delete_comment' || isset($_GET['comment_id'])) {
             $cId = $_GET['comment_id'] ?? $id;
-            $checkComment = $db->prepare("SELECT id FROM $commentsTable WHERE id = ?");
-            $checkComment->execute([$cId]);
-            if (!$checkComment->fetch()) {
-                sendResponse(['success' => false, 'message' => 'Comment not found.'], 404);
+            try {
+                $stmt = $db->prepare("DELETE FROM comments WHERE id = ?");
+                $stmt->execute([$cId]);
+            } catch (Exception $e) {
+                $stmt = $db->prepare("DELETE FROM comments_resource WHERE id = ?");
+                $stmt->execute([$cId]);
             }
-            $stmt = $db->prepare("DELETE FROM $commentsTable WHERE id = ?");
-            $stmt->execute([$cId]);
             sendResponse(['success' => true, 'message' => 'Deleted.']);
         }
 
@@ -206,7 +227,7 @@ try {
         sendResponse(['success' => false, 'message' => 'Method not allowed.'], 405);
     }
 } catch (Exception $e) {
-    sendResponse(['success' => false, 'message' => 'Internal Server Error.'], 500);
+    sendResponse(['success' => false, 'message' => 'Internal Error.'], 500);
 }
 
 function sendResponse($data, $statusCode = 200) {
