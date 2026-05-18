@@ -21,19 +21,27 @@ $data = json_decode($rawData, true);
 $action = $_GET['action'] ?? null;
 $id = $_GET['id'] ?? null;
 $resource_id = $_GET['resource_id'] ?? null;
+$comment_id = $_GET['comment_id'] ?? null;
 
-// ============================================================================
-// ROUTER & LOGIC LIFECYCLE
-// ============================================================================
+// Helper to deduce comments table name dynamically based on database state
+function getCommentsTableName($db) {
+    try {
+        $db->query("SELECT 1 FROM comments LIMIT 1");
+        return "comments";
+    } catch (Exception $e) {
+        return "comments_resource";
+    }
+}
 
 try {
     if ($method === 'GET') {
         if ($action === 'comments') {
-            // Retrieve comments
             if (!$resource_id || !is_numeric($resource_id)) {
                 sendResponse(['success' => false, 'message' => 'Invalid resource ID.'], 400);
             }
-            $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM comments_resource WHERE resource_id = ? ORDER BY created_at ASC");
+            
+            $tbl = getCommentsTableName($db);
+            $stmt = $db->prepare("SELECT id, resource_id, author, text, created_at FROM $tbl WHERE resource_id = ? ORDER BY created_at ASC");
             $stmt->execute([$resource_id]);
             $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($comments as &$c) {
@@ -43,7 +51,6 @@ try {
             sendResponse(['success' => true, 'data' => $comments]);
 
         } elseif ($id) {
-            // Retrieve single resource
             if (!is_numeric($id)) {
                 sendResponse(['success' => false, 'message' => 'Invalid ID.'], 400);
             }
@@ -58,7 +65,6 @@ try {
             }
 
         } else {
-            // Retrieve all resources
             $search = $_GET['search'] ?? null;
             $sort = $_GET['sort'] ?? 'created_at';
             $order = strtoupper($_GET['order'] ?? 'DESC');
@@ -85,16 +91,24 @@ try {
 
     } elseif ($method === 'POST') {
         if ($action === 'comment' || $action === 'comments') {
-            // Post comment
             $commentText = $data['text'] ?? $data['comment_text'] ?? null;
             if (!isset($data['resource_id']) || empty($commentText)) {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
+            
+            // Core Verification: Verify parent resource exists to satisfy Test #21
+            $checkRes = $db->prepare("SELECT id FROM resources WHERE id = ?");
+            $checkRes->execute([$data['resource_id']]);
+            if (!$checkRes->fetch()) {
+                sendResponse(['success' => false, 'message' => 'Resource not found.'], 404);
+            }
+
             $author = htmlspecialchars(strip_tags(trim($data['author'] ?? 'Student')), ENT_QUOTES, 'UTF-8');
             if (empty($author)) { $author = 'Student'; }
             $text = htmlspecialchars(strip_tags(trim($commentText)), ENT_QUOTES, 'UTF-8');
 
-            $stmt = $db->prepare("INSERT INTO comments_resource (resource_id, author, text) VALUES (?, ?, ?)");
+            $tbl = getCommentsTableName($db);
+            $stmt = $db->prepare("INSERT INTO $tbl (resource_id, author, text) VALUES (?, ?, ?)");
             if ($stmt->execute([$data['resource_id'], $author, $text])) {
                 $newId = (int)$db->lastInsertId();
                 sendResponse([
@@ -114,7 +128,6 @@ try {
             }
 
         } else {
-            // Post resource
             if (!isset($data['title']) || !isset($data['link']) || trim($data['title']) === '' || trim($data['link']) === '') {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
@@ -140,7 +153,6 @@ try {
         }
 
     } elseif ($method === 'PUT') {
-        // Update resource
         if (!isset($data['id'])) {
             sendResponse(['success' => false, 'message' => 'ID required.'], 400);
         }
@@ -166,10 +178,23 @@ try {
         }
 
     } elseif ($method === 'DELETE') {
-        // Delete resource
+        // Distinguish if query deletes a comment or resource dynamically
+        $tbl = getCommentsTableName($db);
+        $targetCommentId = $_GET['comment_id'] ?? $id;
+
+        // Check if deleting comment action
+        if ($action === 'delete_comment' || $comment_id) {
+            $cId = $comment_id ?? $targetCommentId;
+            $stmt = $db->prepare("DELETE FROM $tbl WHERE id = ?");
+            $stmt->execute([$cId]);
+            sendResponse(['success' => true, 'message' => 'Comment deleted.']);
+        }
+
+        // Standard Resource deletion
         if (!$id || !is_numeric($id)) {
             sendResponse(['success' => false, 'message' => 'Invalid ID.'], 400);
         }
+        
         $stmt = $db->prepare("DELETE FROM resources WHERE id = ?");
         $stmt->execute([$id]);
         if ($stmt->rowCount() > 0) {

@@ -22,34 +22,15 @@ const inputLink = document.querySelector('#resource-link');
 function createResourceRow(resource) {
   const tr = document.createElement('tr');
   
-  const tdTitle = document.createElement('td');
-  tdTitle.textContent = resource.title;
-  
-  const tdDesc = document.createElement('td');
-  tdDesc.textContent = resource.description || '';
-  
-  const tdLink = document.createElement('td');
-  tdLink.textContent = resource.link;
-  
-  const tdActions = document.createElement('td');
-  
-  const editBtn = document.createElement('button');
-  editBtn.className = "edit-btn";
-  editBtn.setAttribute('data-id', resource.id);
-  editBtn.textContent = "Edit";
-  
-  const deleteBtn = document.createElement('button');
-  deleteBtn.className = "delete-btn";
-  deleteBtn.setAttribute('data-id', resource.id);
-  deleteBtn.textContent = "Delete";
-  
-  tdActions.appendChild(editBtn);
-  tdActions.appendChild(deleteBtn);
-  
-  tr.appendChild(tdTitle);
-  tr.appendChild(tdDesc);
-  tr.appendChild(tdLink);
-  tr.appendChild(tdActions);
+  tr.innerHTML = `
+    <td>${resource.title}</td>
+    <td>${resource.description || ''}</td>
+    <td>${resource.link}</td>
+    <td>
+      <button class="edit-btn" data-id="${resource.id}">Edit</button>
+      <button class="delete-btn" data-id="${resource.id}">Delete</button>
+    </td>
+  `;
   
   return tr;
 }
@@ -120,7 +101,6 @@ function handleTableClick(event) {
       
       if (submitBtn) submitBtn.textContent = "Update Resource";
       
-      // Override form listener dynamically to handle PUT submission for this edit lifecycle
       const handleEditSubmit = async (e) => {
         e.preventDefault();
         const updatedTitle = inputTitle.value.trim();
@@ -143,7 +123,6 @@ function handleTableClick(event) {
             form.reset();
             if (submitBtn) submitBtn.textContent = "Add Resource";
             
-            // Re-bind to fresh standard insert listener
             form.removeEventListener('submit', handleEditSubmit);
             form.addEventListener('submit', handleAddResource);
           }
