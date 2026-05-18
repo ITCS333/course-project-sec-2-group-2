@@ -1,65 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Meta tag for character encoding (UTF-8). -->
     <meta charset="UTF-8">
+
+    <!-- Responsive viewport meta tag (width=device-width, initial-scale=1.0). -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Title, e.g., "Manage Assignments". -->
     <title>Manage Assignments</title>
-    <!-- Add your CSS stylesheet here -->
-    <link rel="stylesheet" href="style.css">
-    <!-- Required: link admin.js with defer -->
+
+    <!-- Link to your CSS framework or stylesheet (Tailwind CSS matches the structure and alignment). -->
+    <link href="https://jsdelivr.net" rel="stylesheet">
+
+    <!-- Required: link admin.js with defer. -->
     <script src="admin.js" defer></script>
 </head>
-<body>
-    <header>
-        <h1>Manage Assignments</h1>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <!-- Header containing an h1 "Manage Assignments". -->
+    <header class="bg-white shadow p-6 mb-6">
+        <h1 class="text-3xl font-bold">Manage Assignments</h1>
     </header>
 
-    <main>
+    <!-- Main content area. -->
+    <main class="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
         <!-- ============================================================
-              Add / Edit Assignment Form
+             Section 1: Add / Edit Assignment Form
              ============================================================ -->
-        <section>
-            <h2>Add a New Assignment</h2>
-            <form id="assignment-form" action="#">
+        <!-- Section for the form. -->
+        <section class="lg:col-span-1 bg-white p-6 rounded-lg shadow h-fit">
+
+            <!-- Sub-heading h2 "Add a New Assignment". -->
+            <h2 class="text-xl font-semibold mb-4">Add a New Assignment</h2>
+
+            <!-- Form id="assignment-form" (action can be "#"). The id is required by admin.js. -->
+            <form id="assignment-form" action="#" method="POST">
+
+                <!-- Fieldset to group the form controls. -->
                 <fieldset>
-                    <legend>Assignment Details</legend>
-                    
-                    <label for="assignment-title">Title:</label>
-                    <input type="text" id="assignment-title" name="assignment-title" required>
+                    <!-- Legend, e.g., "Assignment Details". -->
+                    <legend class="text-gray-600 text-sm mb-4 font-medium">Assignment Details</legend>
 
-                    <label for="assignment-description">Description:</label>
-                    <textarea id="assignment-description" name="assignment-description" rows="5" required></textarea>
+                    <!-- Label and input for the assignment title. -->
+                    <div class="mb-4">
+                        <label for="assignment-title" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input id="assignment-title" type="text" required class="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
 
-                    <label for="assignment-due-date">Due Date:</label>
-                    <input type="date" id="assignment-due-date" name="assignment-due-date" required>
+                    <!-- Label and textarea for the description. Maps to the description column in the assignments table. -->
+                    <div class="mb-4">
+                        <label for="assignment-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="assignment-description" rows="5" required class="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
 
-                    <label for="assignment-files">Attached File URLs (one per line):</label>
-                    <textarea id="assignment-files" name="assignment-files" rows="3"></textarea>
+                    <!-- Label and input for the due date. Maps to the due_date column in the assignments table. -->
+                    <div class="mb-4">
+                        <label for="assignment-due-date" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                        <input id="assignment-due-date" type="date" required class="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
 
-                    <button type="submit" id="add-assignment">Add Assignment</button>
+                    <!-- Label and textarea for attached file URLs (one URL per line). Maps to the files column (JSON array). -->
+                    <div class="mb-6">
+                        <label for="assignment-files" class="block text-sm font-medium text-gray-700 mb-1">Attached Files or Links (one per line)</label>
+                        <textarea id="assignment-files" rows="3" class="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="https://example.com"></textarea>
+                    </div>
+
+                    <!-- Submit button. When in edit mode, admin.js will change text and store the id. -->
+                    <button id="add-assignment" type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition font-medium">Add Assignment</button>
                 </fieldset>
             </form>
         </section>
 
+
         <!-- ============================================================
-              Existing Assignments Table
+             Section 2: Existing Assignments Table
              ============================================================ -->
-        <section>
-            <h2>Current Assignments</h2>
-            <table id="assignments-table">
-                <thead>
+        <!-- Section to display the current list of assignments. -->
+        <section class="lg:col-span-2 bg-white p-6 rounded-lg shadow overflow-x-auto">
+
+            <!-- Sub-heading h2 "Current Assignments". -->
+            <h2 class="text-xl font-semibold mb-4">Current Assignments</h2>
+
+            <!-- Table id="assignments-table". -->
+            <table id="assignments-table" class="min-w-full divide-y divide-gray-200">
+
+                <!-- Thead with columns matching data rendered by admin.js createAssignmentRow(). -->
+                <thead class="bg-gray-50">
                     <tr>
-                        <th>Title</th>
-                        <th>Due Date</th>
-                        <th>Description</th>
-                        <th>Actions</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="assignments-tbody">
-                    <!-- admin.js will inject <tr> rows here -->
+
+                <!-- Tbody id="assignments-tbody". Required by admin.js to inject tr rows dynamically. -->
+                <tbody id="assignments-tbody" class="bg-white divide-y divide-gray-200">
+                    <!-- admin.js will inject dynamic rows here. Left intentionally blank to prevent hardcoding static text. -->
                 </tbody>
+
             </table>
         </section>
+
     </main>
 </body>
 </html>
+

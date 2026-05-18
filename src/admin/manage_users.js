@@ -59,7 +59,7 @@ function handleChangePassword(event) {
   newPasswordInput.value = "";
   confirmPasswordInput.value = "";
 
-  fetch("../api/index.php?action=change_password", {
+  fetch("api/index.php?action=change_password", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -87,7 +87,7 @@ async function handleAddUser(event) {
     const name = document.getElementById("user-name").value;
     const email = document.getElementById("user-email").value;
     const password = document.getElementById("default-password").value;
-    const is_admin = document.getElementById("is-admin").checked ? 1 : 0;
+    const is_admin = document.getElementById("is-admin").value;
 
     if (!name || !email || !password) {
         alert("Please fill out all required fields.");
@@ -99,7 +99,7 @@ async function handleAddUser(event) {
         return;
     }
 
-    const res = await fetch("../api/index.php", {
+    const res = await fetch("api/index.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password, is_admin })
@@ -118,7 +118,7 @@ async function handleTableClick(event) {
     const id = event.target.dataset.id;
 
     if (event.target.classList.contains("delete-btn")) {
-        const res = await fetch("../api/index.php?id=" + id, {
+        const res = await fetch("api/index.php?id=" + id, {
             method: "DELETE"
         });
 
@@ -166,7 +166,7 @@ function handleSort(event) {
 }
 
 async function loadUsersAndInitialize() {
-    const res = await fetch("../api/index.php");
+    const res = await fetch("api/index.php");
     const data = await res.json();
 
     users = data.data;
