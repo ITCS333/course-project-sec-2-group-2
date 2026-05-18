@@ -56,6 +56,16 @@ $db = $database->getConnection();
 $db->exec("CREATE TABLE IF NOT EXISTS resources (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, link TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 $db->exec("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, resource_id INTEGER NOT NULL, author TEXT, text TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 
+// Seed default resources if the table is empty
+$count = $db->query("SELECT COUNT(*) FROM resources")->fetchColumn();
+if ((int)$count === 0) {
+    $db->exec("INSERT INTO resources (title, description, link) VALUES
+        ('MDN Web Docs', 'Comprehensive documentation for HTML, CSS, and JavaScript by Mozilla.', 'https://developer.mozilla.org'),
+        ('W3Schools', 'Beginner-friendly web development tutorials and references.', 'https://www.w3schools.com'),
+        ('CSS Tricks', 'Tips, tricks, and techniques for CSS and front-end development.', 'https://css-tricks.com')
+    ");
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $rawData = file_get_contents('php://input');
 $data = json_decode($rawData, true) ?: [];
@@ -126,7 +136,7 @@ try {
             if (!$rId || empty($cText)) {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
-            
+
             $check = $db->prepare("SELECT id FROM resources WHERE id = ?");
             $check->execute([$rId]);
             if (!$check->fetch()) {
@@ -141,7 +151,7 @@ try {
             if ($stmt->execute([$rId, $author, $text])) {
                 $newId = (int)$db->lastInsertId();
                 sendResponse([
-                    'success' => true, 
+                    'success' => true,
                     'id' => $newId,
                     'data' => ['id' => $newId, 'resource_id' => (int)$rId, 'author' => $author, 'text' => $text]
                 ], 201);
@@ -153,10 +163,15 @@ try {
             if (!isset($data['title']) || !isset($data['link']) || trim($data['title']) === '' || trim($data['link']) === '') {
                 sendResponse(['success' => false, 'message' => 'Missing fields.'], 400);
             }
-            
+
+            // Validate URL
+            $link = trim($data['link']);
+            if (!filter_var($link, FILTER_VALIDATE_URL)) {
+                sendResponse(['success' => false, 'message' => 'Invalid URL.'], 400);
+            }
+
             $title = htmlspecialchars(strip_tags(trim($data['title'])), ENT_QUOTES, 'UTF-8');
             $description = htmlspecialchars(strip_tags(trim($data['description'] ?? '')), ENT_QUOTES, 'UTF-8');
-            $link = trim($data['link']);
 
             $stmt = $db->prepare("INSERT INTO resources (title, description, link) VALUES (?, ?, ?)");
             if ($stmt->execute([$title, $description, $link])) {
@@ -186,6 +201,11 @@ try {
             sendResponse(['success' => false, 'message' => 'Invalid input.'], 400);
         }
 
+        // Validate URL
+        if (!filter_var($link, FILTER_VALIDATE_URL)) {
+            sendResponse(['success' => false, 'message' => 'Invalid URL.'], 400);
+        }
+
         $stmt = $db->prepare("UPDATE resources SET title = ?, description = ?, link = ? WHERE id = ?");
         if ($stmt->execute([$title, $description, $link, $targetId])) {
             sendResponse(['success' => true, 'message' => 'Updated.']);
@@ -195,7 +215,7 @@ try {
 
     } elseif ($method === 'DELETE') {
         $commentId = $_GET['comment_id'] ?? $data['comment_id'] ?? null;
-        
+
         if ($action === 'delete_comment' || $commentId !== null) {
             $targetCId = $commentId ?? $id;
             $checkComment = $db->prepare("SELECT id FROM comments WHERE id = ?");

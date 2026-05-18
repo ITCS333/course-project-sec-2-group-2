@@ -16,6 +16,24 @@ const submitBtn = document.querySelector('#add-resource');
 
 let editResourceId = null;
 
+// Helper: always get the current authoritative resources array
+function getResources() {
+  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
+    return window.resources;
+  }
+  if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
+    return global.resources;
+  }
+  return resources;
+}
+
+// Helper: write back to all scopes
+function setResources(arr) {
+  resources = arr;
+  if (typeof window !== 'undefined') window.resources = arr;
+  if (typeof global !== 'undefined') global.resources = arr;
+}
+
 /**
  * Implement the createResourceRow function.
  */
@@ -39,17 +57,12 @@ function createResourceRow(resource) {
 function renderTable() {
   const targetBody = document.querySelector('#resources-tbody');
   if (!targetBody) return;
-  
+
+  const data = getResources();
+  resources = data;
+
   targetBody.innerHTML = '';
-
-  // Synchronize reference with whatever sandbox context Jest is manipulating
-  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-    resources = window.resources;
-  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-    resources = global.resources;
-  }
-
-  resources.forEach(resource => {
+  data.forEach(resource => {
     targetBody.appendChild(createResourceRow(resource));
   });
 }
@@ -61,16 +74,12 @@ async function handleAddResource(event) {
   if (event && typeof event.preventDefault === 'function') {
     event.preventDefault();
   }
-  
+
   const title = inputTitle ? inputTitle.value.trim() : '';
   const description = inputDesc ? inputDesc.value.trim() : '';
   const link = inputLink ? inputLink.value.trim() : '';
 
-  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-    resources = window.resources;
-  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-    resources = global.resources;
-  }
+  const currentResources = getResources();
 
   if (editResourceId !== null) {
     try {
@@ -81,10 +90,11 @@ async function handleAddResource(event) {
       });
       const result = await response.json();
       if (result && result.success) {
-        const idx = resources.findIndex(r => r.id === parseInt(editResourceId));
+        const idx = currentResources.findIndex(r => r.id === parseInt(editResourceId));
         if (idx !== -1) {
-          resources[idx] = { id: parseInt(editResourceId), title, description, link };
+          currentResources[idx] = { id: parseInt(editResourceId), title, description, link };
         }
+        setResources(currentResources);
         renderTable();
         if (form) form.reset();
         editResourceId = null;
@@ -103,7 +113,8 @@ async function handleAddResource(event) {
       const result = await response.json();
       if (result && result.success) {
         const newId = result.id || (result.data && result.data.id);
-        resources.push({ id: parseInt(newId), title, description, link });
+        currentResources.push({ id: parseInt(newId), title, description, link });
+        setResources(currentResources);
         renderTable();
         if (form) form.reset();
       }
@@ -119,15 +130,11 @@ async function handleAddResource(event) {
 function handleTableClick(event) {
   const target = event ? event.target : null;
   if (!target) return;
-  
+
   const id = target.getAttribute('data-id');
   if (!id) return;
 
-  if (typeof window !== 'undefined' && Array.isArray(window.resources)) {
-    resources = window.resources;
-  } else if (typeof global !== 'undefined' && Array.isArray(global.resources)) {
-    resources = global.resources;
-  }
+  const currentResources = getResources();
 
   if (target.classList.contains('delete-btn')) {
     fetch(`./api/index.php?id=${id}`, { method: 'DELETE' })
@@ -135,15 +142,14 @@ function handleTableClick(event) {
       .then(result => {
         if (result && result.success) {
           const targetId = parseInt(id);
-          resources = resources.filter(r => r.id !== targetId);
-          if (typeof window !== 'undefined') window.resources = resources;
-          if (typeof global !== 'undefined') global.resources = resources;
+          const updated = currentResources.filter(r => r.id !== targetId);
+          setResources(updated);
           renderTable();
         }
       }).catch(err => console.error(err));
-      
+
   } else if (target.classList.contains('edit-btn')) {
-    const resource = resources.find(r => r.id === parseInt(id));
+    const resource = currentResources.find(r => r.id === parseInt(id));
     if (resource) {
       editResourceId = id;
       if (inputTitle) inputTitle.value = resource.title;
@@ -162,14 +168,13 @@ async function loadAndInitialize() {
     const response = await fetch('./api/index.php');
     const result = await response.json();
     if (result && result.success && Array.isArray(result.data)) {
-      resources = result.data.map(r => ({
+      const loaded = result.data.map(r => ({
         id: parseInt(r.id),
         title: r.title,
         description: r.description,
         link: r.link
       }));
-      if (typeof window !== 'undefined') window.resources = resources;
-      if (typeof global !== 'undefined') global.resources = resources;
+      setResources(loaded);
       renderTable();
     }
   } catch (error) {
@@ -177,7 +182,7 @@ async function loadAndInitialize() {
   }
 
   if (form) form.addEventListener('submit', handleAddResource);
-  
+
   const targetBody = document.querySelector('#resources-tbody');
   if (targetBody) {
     targetBody.addEventListener('click', handleTableClick);
