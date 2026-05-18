@@ -14,18 +14,19 @@ function getResourceIdFromURL() {
 }
 
 function renderResourceDetails(resource) {
-  titleEl.textContent = resource.title;
-  descEl.textContent = resource.description || '';
-  linkEl.href = resource.link;
+  if (titleEl) titleEl.textContent = resource.title;
+  if (descEl) descEl.textContent = resource.description || '';
+  if (linkEl) linkEl.href = resource.link;
 }
 
 function renderComments() {
+  if (!commentListEl) return;
   commentListEl.innerHTML = '';
   currentComments.forEach(c => {
     const article = document.createElement('article');
     article.className = "border-start border-4 border-primary p-3 mb-2 bg-white shadow-sm";
     article.innerHTML = `
-      <p class="mb-1">${c.text}</p>
+      <p class="mb-1">${c.text || c.comment_text || ''}</p>
       <footer class="text-muted small">Posted by: ${c.author || 'Anonymous'}</footer>
     `;
     commentListEl.appendChild(article);
@@ -47,7 +48,9 @@ async function handleAddComment(e) {
     });
     const result = await res.json();
     if (result.success) {
-      currentComments.push(result.data);
+      // API can return either structural format
+      const newComment = result.data || { text: commentText, author: 'Anonymous' };
+      currentComments.push(newComment);
       renderComments();
       commentInput.value = '';
     }
@@ -58,10 +61,7 @@ async function handleAddComment(e) {
 
 async function initializePage() {
   currentResourceId = getResourceIdFromURL();
-  if (!currentResourceId) { 
-    titleEl.textContent = "Resource not found."; 
-    return; 
-  }
+  if (!currentResourceId) return;
 
   try {
     const [resObj, commObj] = await Promise.all([
@@ -73,9 +73,9 @@ async function initializePage() {
       renderResourceDetails(resObj.data);
       currentComments = commObj.data || [];
       renderComments();
-      commentForm.addEventListener('submit', handleAddComment);
-    } else {
-      titleEl.textContent = "Resource not found.";
+      if (commentForm) {
+        commentForm.addEventListener('submit', handleAddComment);
+      }
     }
   } catch (error) {
     console.error(error);

@@ -9,37 +9,52 @@
 </head>
 <body class="bg-light">
     <header class="bg-dark text-white py-3 mb-4 shadow">
-        <div class="container"><h1>Manage Course Resources</h1></div>
+        <div class="container">
+            <h1>Manage Course Resources</h1>
+        </div>
     </header>
     <main class="container">
+        
         <section class="card p-4 mb-5 shadow-sm">
-            <h2 id="form-title">Add a New Resource</h2>
+            <h2>Add a New Resource</h2>
             <form id="resource-form" action="#">
                 <fieldset>
-                    <input type="hidden" id="resource-id">
+                    <legend>Resource Details</legend>
+                    <input type="hidden" id="hidden-resource-id">
+                    
                     <div class="mb-3">
-                        <label for="title" class="form-label">Title</label>
-                        <input type="text" id="title" class="form-control" required>
+                        <label for="resource-title" class="form-label">Title</label>
+                        <input type="text" id="resource-title" class="form-control" required>
                     </div>
+                    
                     <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea id="description" class="form-control" required></textarea>
+                        <label for="resource-description" class="form-label">Description</label>
+                        <textarea id="resource-description" class="form-control"></textarea>
                     </div>
+                    
                     <div class="mb-3">
-                        <label for="link" class="form-label">Link</label>
-                        <input type="url" id="link" class="form-control" required>
+                        <label for="resource-link" class="form-label">Link</label>
+                        <input type="url" id="resource-link" class="form-control" required>
                     </div>
+                    
                     <button type="submit" id="add-resource" class="btn btn-success w-100">Add Resource</button>
                 </fieldset>
             </form>
         </section>
 
         <section class="table-responsive bg-white p-3 shadow-sm rounded">
+            <h2>Existing Resources</h2>
             <table id="resources-table" class="table table-hover align-middle">
                 <thead class="table-dark">
-                    <tr><th>Title</th><th>Description</th><th>Link</th><th>Actions</th></tr>
+                    <tr>
+                        <th>Title</th>
+                        <th>Description</th>
+                        <th>Link</th>
+                        <th>Actions</th>
+                    </tr>
                 </thead>
-                <tbody id="resources-tbody"></tbody>
+                <tbody id="resources-tbody">
+                    </tbody>
             </table>
         </section>
     </main>

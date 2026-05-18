@@ -2,7 +2,11 @@ let resources = [];
 const form = document.querySelector('#resource-form');
 const tbody = document.querySelector('#resources-tbody');
 const submitBtn = document.querySelector('#add-resource');
-const formTitle = document.querySelector('#form-title');
+
+const inputId = document.querySelector('#hidden-resource-id');
+const inputTitle = document.querySelector('#resource-title');
+const inputDesc = document.querySelector('#resource-description');
+const inputLink = document.querySelector('#resource-link');
 
 function createResourceRow(resource) {
   const tr = document.createElement('tr');
@@ -19,6 +23,7 @@ function createResourceRow(resource) {
 }
 
 function renderTable() {
+  if (!tbody) return;
   tbody.innerHTML = '';
   resources.forEach(res => {
     tbody.appendChild(createResourceRow(res));
@@ -27,10 +32,10 @@ function renderTable() {
 
 async function handleAddResource(event) {
   event.preventDefault();
-  const id = document.querySelector('#resource-id').value;
-  const title = document.querySelector('#title').value;
-  const description = document.querySelector('#description').value;
-  const link = document.querySelector('#link').value;
+  const id = inputId ? inputId.value : '';
+  const title = inputTitle.value;
+  const description = inputDesc.value;
+  const link = inputLink.value;
 
   const payload = { title, description, link };
   let method = 'POST';
@@ -48,10 +53,9 @@ async function handleAddResource(event) {
     });
     const result = await response.json();
     if (result.success) {
-      form.reset();
-      document.querySelector('#resource-id').value = '';
-      submitBtn.textContent = "Add Resource";
-      formTitle.textContent = "Add a New Resource";
+      if (form) form.reset();
+      if (inputId) inputId.value = '';
+      if (submitBtn) submitBtn.textContent = "Add Resource";
       await loadAndInitialize();
     }
   } catch (error) {
@@ -74,13 +78,11 @@ function handleTableClick(event) {
   } else if (event.target.classList.contains('edit-btn')) {
     const resource = resources.find(r => r.id == id);
     if (resource) {
-      document.querySelector('#resource-id').value = resource.id;
-      document.querySelector('#title').value = resource.title;
-      document.querySelector('#description').value = resource.description || '';
-      document.querySelector('#link').value = resource.link;
-      
-      submitBtn.textContent = "Update Resource";
-      formTitle.textContent = "Edit Resource";
+      if (inputId) inputId.value = resource.id;
+      if (inputTitle) inputTitle.value = resource.title;
+      if (inputDesc) inputDesc.value = resource.description || '';
+      if (inputLink) inputLink.value = resource.link;
+      if (submitBtn) submitBtn.textContent = "Update Resource";
     }
   }
 }
@@ -100,7 +102,7 @@ async function loadAndInitialize() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadAndInitialize().then(() => {
-    form.addEventListener('submit', handleAddResource);
-    tbody.addEventListener('click', handleTableClick);
+    if (form) form.addEventListener('submit', handleAddResource);
+    if (tbody) tbody.addEventListener('click', handleTableClick);
   });
 });
